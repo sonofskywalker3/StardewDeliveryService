@@ -1,0 +1,16 @@
+{
+    "Name": "Stardew Delivery Service",
+    "Author": "sonofskywalker3",
+    "Version": "0.3.0",
+    "Description": "Pulls building/trade materials from your chests when you're short, plus a chest browser accessible from your inventory.",
+    "UniqueID": "sonofskywalker3.StardewDeliveryService",
+    "EntryDll": "StardewDeliveryService.dll",
+    "MinimumApiVersion": "4.0.0",
+    "UpdateKeys": [],
+    "Dependencies": [
+        {
+            "UniqueID": "spacechase0.GenericModConfigMenu",
+            "IsRequired": false
+        }
+    ]
+}
