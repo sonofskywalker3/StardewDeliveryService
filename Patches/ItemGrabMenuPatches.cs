@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -20,6 +21,9 @@ namespace StardewDeliveryService.Patches
         private static ClickableTextureComponent _prevButton;
         private static ClickableTextureComponent _nextButton;
         private static string _chestLabel;
+
+        // Android-only: InventoryMenu.drawInfoPanel(SpriteBatch, bool) for mobile floating tooltips
+        private static MethodInfo _drawInfoPanelMethod;
 
         internal static void Init(ModConfig config, IMonitor monitor)
         {
@@ -54,6 +58,9 @@ namespace StardewDeliveryService.Patches
                 original: AccessTools.Method(typeof(ItemGrabMenu), nameof(ItemGrabMenu.performHoverAction)),
                 postfix: new HarmonyMethod(typeof(ItemGrabMenuPatches), nameof(PerformHoverAction_Postfix))
             );
+
+            // Android has InventoryMenu.drawInfoPanel(SpriteBatch, bool) — PC doesn't
+            _drawInfoPanelMethod = AccessTools.Method(typeof(InventoryMenu), "drawInfoPanel", new[] { typeof(SpriteBatch), typeof(bool) });
         }
 
         /// <summary>Create arrow buttons and label when the chest browser opens an ItemGrabMenu.</summary>
@@ -411,6 +418,16 @@ namespace StardewDeliveryService.Patches
             }
 
             // Redraw tooltips on top of our arrows/label
+            // Android: redraw mobile floating tooltips via InventoryMenu.drawInfoPanel
+            if (_drawInfoPanelMethod != null)
+            {
+                if (__instance.inventory != null)
+                    _drawInfoPanelMethod.Invoke(__instance.inventory, new object[] { b, true });
+                if (__instance.ItemsToGrabMenu != null)
+                    _drawInfoPanelMethod.Invoke(__instance.ItemsToGrabMenu, new object[] { b, true });
+            }
+
+            // PC: redraw standard tooltips
             if (__instance.hoveredItem != null)
                 IClickableMenu.drawToolTip(b, __instance.hoveredItem.getDescription(), __instance.hoveredItem.DisplayName, __instance.hoveredItem, Game1.player.CursorSlotItem != null);
             else if (!string.IsNullOrEmpty(__instance.hoverText))
