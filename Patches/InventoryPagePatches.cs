@@ -71,6 +71,17 @@ namespace StardewDeliveryService.Patches
                 );
             }
 
+            // Android: draw Junimo icon in InventoryMenu.draw prefix so it's behind tooltips.
+            // On Android, InventoryPage.draw ends with inventory.draw(b) which draws tooltips
+            // internally. Drawing the icon before inventory.draw ensures tooltips are on top.
+            if (Constants.TargetPlatform == GamePlatform.Android)
+            {
+                harmony.Patch(
+                    original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.draw), new[] { typeof(SpriteBatch) }),
+                    prefix: new HarmonyMethod(typeof(InventoryPagePatches), nameof(InventoryMenu_Draw_Prefix))
+                );
+            }
+
             _junimoTexture = Game1.content.Load<Texture2D>("Characters\\Junimo");
 
             _hoverTextField = AccessTools.Field(typeof(InventoryPage), "hoverText");
@@ -210,6 +221,38 @@ namespace StardewDeliveryService.Patches
                 trash.upNeighborID = DeliveryIconID;
         }
 
+        /// <summary>Draw the Junimo icon with a green tint.</summary>
+        private static void DrawJunimoIcon(SpriteBatch b)
+        {
+            b.Draw(
+                _deliveryIcon.texture,
+                new Vector2(_deliveryIcon.bounds.X, _deliveryIcon.bounds.Y),
+                _deliveryIcon.sourceRect,
+                new Color(80, 200, 80),  // Junimo green
+                0f,
+                Vector2.Zero,
+                _deliveryIcon.scale,
+                SpriteEffects.None,
+                0.86f
+            );
+        }
+
+        /// <summary>
+        /// Android only: draw Junimo icon before InventoryMenu draws slots and tooltips.
+        /// The icon is in the sidebar so it doesn't overlap with inventory slots.
+        /// </summary>
+        private static void InventoryMenu_Draw_Prefix(InventoryMenu __instance, SpriteBatch b)
+        {
+            if (!Config.EnableChestBrowser || _deliveryIcon == null)
+                return;
+            if (!(Game1.activeClickableMenu is GameMenu gm))
+                return;
+            if (!(gm.GetCurrentPage() is InventoryPage invPage) || __instance != invPage.inventory)
+                return;
+
+            DrawJunimoIcon(b);
+        }
+
         private static void Draw_Postfix(InventoryPage __instance, SpriteBatch b)
         {
             if (!Config.EnableChestBrowser || _deliveryIcon == null)
@@ -225,23 +268,12 @@ namespace StardewDeliveryService.Patches
             if (Constants.TargetPlatform != GamePlatform.Android)
                 WirePCNeighbors(__instance);
 
-            // Draw manually with a green tint — the Junimo sprite is white/pale without one
-            b.Draw(
-                _deliveryIcon.texture,
-                new Vector2(_deliveryIcon.bounds.X, _deliveryIcon.bounds.Y),
-                _deliveryIcon.sourceRect,
-                new Color(80, 200, 80),  // Junimo green
-                0f,
-                Vector2.Zero,
-                _deliveryIcon.scale,
-                SpriteEffects.None,
-                0.86f
-            );
-
-            // Redraw tooltips on top of our icon so they aren't hidden behind it (PC only —
-            // Android tooltips are drawn inside InventoryMenu.draw and can't be redrawn here)
+            // PC: draw icon here and redraw tooltips on top.
+            // Android: icon is drawn in InventoryMenu_Draw_Prefix (before tooltips).
             if (Constants.TargetPlatform != GamePlatform.Android)
             {
+                DrawJunimoIcon(b);
+
                 var hoveredItem = _hoveredItemField?.GetValue(__instance) as Item;
                 var hoverText = _hoverTextField?.GetValue(__instance) as string;
 
