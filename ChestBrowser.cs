@@ -130,7 +130,7 @@ namespace StardewDeliveryService
             try
             {
                 Monitor?.Log("[DIAG] About to call CalculateDiffCost (one-shot)...", LogLevel.Trace);
-                int cost = CalculateDiffCost();
+                int cost = CalculateDiffCost(diag: true);
                 Monitor?.Log($"[DIAG] CalculateDiffCost returned {cost} (one-shot OK)", LogLevel.Trace);
             }
             catch (Exception ex)
@@ -296,9 +296,11 @@ namespace StardewDeliveryService
         }
 
         /// <summary>Build a map of the player's current inventory (including cursor/held item): key → (totalCount, unitSellPrice).</summary>
-        private static Dictionary<string, (int count, int unitPrice)> SnapshotInventory()
+        private static Dictionary<string, (int count, int unitPrice)> SnapshotInventory(bool diag = false)
         {
+            if (diag) Monitor?.Log("[DIAG-SI] entering SnapshotInventory", LogLevel.Trace);
             var map = new Dictionary<string, (int count, int unitPrice)>();
+            if (diag) Monitor?.Log($"[DIAG-SI] player.Items.Count={Game1.player.Items.Count}", LogLevel.Trace);
             foreach (var item in Game1.player.Items)
             {
                 if (item == null) continue;
@@ -307,30 +309,46 @@ namespace StardewDeliveryService
                 map.TryGetValue(key, out var existing);
                 map[key] = (existing.count + item.Stack, price > 0 ? price : existing.unitPrice);
             }
+            if (diag) Monitor?.Log($"[DIAG-SI] inventory loop done, {map.Count} keys", LogLevel.Trace);
 
-            // Include held/cursor item — items picked up from inventory or chest
-            // live here temporarily during transfers. Check both CursorSlotItem
-            // and the menu's heldItem (different SDV versions use different fields).
+            // Include held/cursor item
+            if (diag) Monitor?.Log("[DIAG-SI] checking CursorSlotItem...", LogLevel.Trace);
             Item heldItem = Game1.player.CursorSlotItem;
-            if (heldItem == null && Game1.activeClickableMenu is ItemGrabMenu igm)
-                heldItem = igm.heldItem;
+            if (diag) Monitor?.Log($"[DIAG-SI] CursorSlotItem={(heldItem != null ? heldItem.DisplayName : "null")}", LogLevel.Trace);
+
+            if (heldItem == null)
+            {
+                if (diag) Monitor?.Log("[DIAG-SI] checking activeClickableMenu for heldItem...", LogLevel.Trace);
+                if (Game1.activeClickableMenu is ItemGrabMenu igm)
+                {
+                    if (diag) Monitor?.Log("[DIAG-SI] menu IS ItemGrabMenu, accessing heldItem...", LogLevel.Trace);
+                    heldItem = igm.heldItem;
+                    if (diag) Monitor?.Log($"[DIAG-SI] igm.heldItem={(heldItem != null ? heldItem.DisplayName : "null")}", LogLevel.Trace);
+                }
+            }
+
             if (heldItem != null)
             {
+                if (diag) Monitor?.Log("[DIAG-SI] processing heldItem...", LogLevel.Trace);
                 string key = $"{heldItem.QualifiedItemId}:{heldItem.Quality}";
                 int price = heldItem.sellToStorePrice();
                 map.TryGetValue(key, out var existing);
                 map[key] = (existing.count + heldItem.Stack, price > 0 ? price : existing.unitPrice);
             }
 
+            if (diag) Monitor?.Log($"[DIAG-SI] returning, {map.Count} keys total", LogLevel.Trace);
             return map;
         }
 
         /// <summary>Calculate delivery cost as 3% of the absolute net value change since session open.</summary>
-        private static int CalculateDiffCost()
+        private static int CalculateDiffCost(bool diag = false)
         {
-            var current = SnapshotInventory();
+            if (diag) Monitor?.Log("[DIAG-CDC] calling SnapshotInventory...", LogLevel.Trace);
+            var current = SnapshotInventory(diag);
+            if (diag) Monitor?.Log("[DIAG-CDC] SnapshotInventory done, building HashSet...", LogLevel.Trace);
             var allKeys = new HashSet<string>(_inventorySnapshot.Keys);
             allKeys.UnionWith(current.Keys);
+            if (diag) Monitor?.Log($"[DIAG-CDC] {allKeys.Count} keys, computing diff...", LogLevel.Trace);
 
             int totalCost = 0;
             foreach (string key in allKeys)
@@ -341,12 +359,12 @@ namespace StardewDeliveryService
                 int diff = Math.Abs(now.count - was.count);
                 if (diff <= 0) continue;
 
-                // Use whichever unit price we have (current or snapshot)
                 int unitPrice = now.unitPrice > 0 ? now.unitPrice : was.unitPrice;
-                if (unitPrice <= 0) continue; // unsellable items are free
+                if (unitPrice <= 0) continue;
 
                 totalCost += Math.Max(1, (int)(unitPrice * diff * 0.03));
             }
+            if (diag) Monitor?.Log($"[DIAG-CDC] done, totalCost={totalCost}", LogLevel.Trace);
             return totalCost;
         }
 
