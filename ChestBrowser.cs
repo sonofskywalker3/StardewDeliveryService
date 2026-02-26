@@ -105,7 +105,9 @@ namespace StardewDeliveryService
                 if (cost != _lastDisplayedCost)
                 {
                     _lastDisplayedCost = cost;
-                    UpdateCostHUD(cost);
+                    // DIAGNOSTIC: skip HUD updates to test if hudMessages modification causes Android crash
+                    // UpdateCostHUD(cost);
+                    Monitor?.Log($"[DIAG] Cost changed to {cost}g (HUD disabled for crash test)", LogLevel.Trace);
                 }
             }
             catch (Exception ex)
