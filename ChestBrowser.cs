@@ -23,9 +23,6 @@ namespace StardewDeliveryService
         /// <summary>Whether the user cancelled via the X button (skip charging, restore items).</summary>
         private static bool _cancelled;
 
-        /// <summary>The HUD message showing the running total (kept alive while browsing).</summary>
-        private static HUDMessage _costMessage;
-
         /// <summary>Snapshot of player inventory at session open. Key: "QualifiedItemId:Quality", Value: (count, unitSellPrice).</summary>
         private static Dictionary<string, (int count, int unitPrice)> _inventorySnapshot = new();
 
@@ -64,7 +61,6 @@ namespace StardewDeliveryService
             _currentIndex = 0;
             _isActive = true;
             _cancelled = false;
-            _costMessage = null;
             _lastDisplayedCost = 0;
             _chargeFees = ModEntry.Config.EnableProgressionGating
                 && DeliveryState.Provider == DeliveryProvider.Shane;
@@ -128,13 +124,6 @@ namespace StardewDeliveryService
                     Game1.addHUDMessage(new HUDMessage($"Shane's fee: {charge}g") { noIcon = true });
                     Monitor?.Log($"Charged delivery fee: {charge}g (calculated: {totalCost}g)", LogLevel.Trace);
                 }
-            }
-
-            // Remove the running total HUD message
-            if (_costMessage != null)
-            {
-                Game1.hudMessages.Remove(_costMessage);
-                _costMessage = null;
             }
 
             _lastDisplayedCost = 0;
@@ -330,20 +319,5 @@ namespace StardewDeliveryService
             return totalCost;
         }
 
-        /// <summary>Show or update the persistent HUD message with the delivery total.</summary>
-        private static void UpdateCostHUD(int cost)
-        {
-            if (_costMessage != null)
-                Game1.hudMessages.Remove(_costMessage);
-
-            if (cost <= 0)
-            {
-                _costMessage = null;
-                return;
-            }
-
-            _costMessage = new HUDMessage($"Delivery total: {cost}g") { noIcon = true, timeLeft = 99999f };
-            Game1.addHUDMessage(_costMessage);
-        }
     }
 }
