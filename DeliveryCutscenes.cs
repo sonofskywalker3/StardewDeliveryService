@@ -1,3 +1,4 @@
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
@@ -13,6 +14,32 @@ namespace StardewDeliveryService
         /// <summary>Unique ID for the Junimo TemporaryAnimatedSprite so we can clean it up.</summary>
         private const int JunimoSpriteId = 777777;
 
+        /// <summary>Whether we're expecting a Junimo poof (sparkle burst when the sprite is removed).</summary>
+        private static bool _expectingJunimoPoof;
+
+        /// <summary>Pixel position of the Junimo for the poof effect.</summary>
+        private static Vector2 _junimoPoofPosition;
+
+        /// <summary>Apply Harmony patches for cutscene effects.</summary>
+        public static void Apply(Harmony harmony)
+        {
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GameLocation), "removeTemporarySpritesWithIDLocal"),
+                postfix: new HarmonyMethod(typeof(DeliveryCutscenes), nameof(RemoveSpritesLocal_Postfix))
+            );
+        }
+
+        /// <summary>When the event command removes our Junimo sprite, spawn sparkles on the same frame.</summary>
+        private static void RemoveSpritesLocal_Postfix(GameLocation __instance, int id)
+        {
+            if (id == JunimoSpriteId && _expectingJunimoPoof)
+            {
+                _expectingJunimoPoof = false;
+                SpawnSparkles(__instance, _junimoPoofPosition);
+                __instance.localSound("junimoMeep1");
+            }
+        }
+
         /// <summary>Get the farmhouse porch entry tile. Farmer appears here when exiting.</summary>
         private static Point GetPorchEntry()
         {
@@ -25,6 +52,10 @@ namespace StardewDeliveryService
         /// so we use a TemporaryAnimatedSprite instead.</summary>
         private static void SpawnJunimoSprite(GameLocation location, int tileX, int tileY, Color color)
         {
+            // Track position for the poof effect when the sprite is removed
+            _junimoPoofPosition = new Vector2(tileX * 64, tileY * 64 - 32);
+            _expectingJunimoPoof = true;
+
             // Junimo idle bounce: frames 8-11 on the sprite sheet (row 1, columns 0-3)
             // Sheet is 128px wide = 8 columns of 16px sprites
             location.temporarySprites.Add(new TemporaryAnimatedSprite(
@@ -90,15 +121,15 @@ namespace StardewDeliveryService
             SpawnJunimoSprite(location, jx, jy, Color.LimeGreen);
 
             // Event with just the farmer — Junimo visual is handled by the TAS above
-            // After last message: remove Junimo sprite mid-cutscene, play poof sound,
-            // then 2-second pause so player sees the disappearance before fade-out
+            // After last message: event command removes the Junimo sprite, which triggers
+            // our Harmony postfix to spawn sparkles + sound on the same frame (masking the disappearance).
+            // Then 2-second pause so player sees the sparkles before fade-out.
             string script =
                 $"none/{fx} {fy}/farmer {fx} {fy} 2" +
                 "/pause 800" +
-                "/message \"A small Junimo bounces excitedly on your porch!\"" +
+                "/message \"A Junimo bounces excitedly on your porch!\"" +
                 "/pause 400" +
                 "/message \"He hands you a small pin. I wonder what it does?\"" +
-                "/playSound junimoMeep1" +
                 $"/specificTemporarySprite removeSprite {JunimoSpriteId}" +
                 "/pause 2000" +
                 "/end";
@@ -106,8 +137,6 @@ namespace StardewDeliveryService
             var evt = new Event(script, null, "SDS_JunimoUnlock");
             evt.onEventFinished = () =>
             {
-                // Sparkle burst at the Junimo's last position (visible briefly during fade)
-                SpawnSparkles(location, new Vector2(jx * 64, jy * 64 - 32));
                 DeliveryState.UnlockJunimo();
                 Game1.addHUDMessage(new HUDMessage("Junimo Delivery Service unlocked!") { noIcon = true });
                 Monitor?.Log("Junimo unlock cutscene completed", LogLevel.Info);
@@ -141,7 +170,6 @@ namespace StardewDeliveryService
                 "/message \"The Junimo looks at you sadly...\"" +
                 "/pause 400" +
                 "/message \"It seems to understand. With a quiet wave, it vanishes.\"" +
-                "/playSound junimoMeep1" +
                 $"/specificTemporarySprite removeSprite {JunimoSpriteId}" +
                 "/pause 2000" +
                 "/end";
@@ -149,7 +177,6 @@ namespace StardewDeliveryService
             var evt = new Event(script, null, "SDS_JojaBetrayal");
             evt.onEventFinished = () =>
             {
-                SpawnSparkles(location, new Vector2(jx * 64, jy * 64 - 32));
                 DeliveryState.DisableJunimoForJoja();
                 Game1.addHUDMessage(new HUDMessage("The Junimos have stopped helping.") { noIcon = true });
                 Monitor?.Log("Joja betrayal cutscene completed", LogLevel.Info);

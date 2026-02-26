@@ -28,6 +28,7 @@ namespace StardewDeliveryService
             var harmony = new Harmony(this.ModManifest.UniqueID);
             InventoryPagePatches.Apply(harmony);
             ItemGrabMenuPatches.Apply(harmony);
+            DeliveryCutscenes.Apply(harmony);
 
             this.Monitor.Log("Stardew Delivery Service loaded", LogLevel.Info);
 
