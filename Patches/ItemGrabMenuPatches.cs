@@ -114,7 +114,7 @@ namespace StardewDeliveryService.Patches
             {
                 myID = NextButtonID,
                 leftNeighborID = PrevButtonID,
-                rightNeighborID = -7777,
+                rightNeighborID = CancelButtonID,
                 upNeighborID = -7777,
                 downNeighborID = -99998,
                 hoverText = "Next chest"
@@ -178,13 +178,23 @@ namespace StardewDeliveryService.Patches
             var grab = menu.ItemsToGrabMenu;
             if (grab == null) return;
 
-            // Position: top-right of the chest grid area
-            int btnX = grab.xPositionOnScreen + grab.width + 8;
-            int btnY;
+            // Position: next to the next-arrow button on PC, or near label on Android
+            int btnX, btnY;
             if (Constants.TargetPlatform == GamePlatform.Android)
+            {
+                btnX = grab.xPositionOnScreen + grab.width + 8;
                 btnY = menu.yPositionOnScreen + 4;
+            }
             else
-                btnY = menu.yPositionOnScreen - 52;
+            {
+                // PC: place next to the next-arrow (right side, same row)
+                btnX = _nextButton != null
+                    ? _nextButton.bounds.X + _nextButton.bounds.Width + 16
+                    : menu.xPositionOnScreen + menu.width + 80;
+                btnY = _nextButton != null
+                    ? _nextButton.bounds.Y
+                    : menu.yPositionOnScreen - 56;
+            }
 
             // Standard PC close button sprite: Game1.mouseCursors at (337, 494, 12, 12)
             _cancelButton = new ClickableTextureComponent(
@@ -244,7 +254,7 @@ namespace StardewDeliveryService.Patches
             }
         }
 
-        /// <summary>Wire PC arrow buttons to/from the top row of the chest inventory grid.</summary>
+        /// <summary>Wire PC arrow/cancel buttons to/from the top row of the chest inventory grid.</summary>
         private static void WirePCArrowsToChestGrid(ItemGrabMenu menu)
         {
             var slots = menu.ItemsToGrabMenu?.inventory;
@@ -260,8 +270,11 @@ namespace StardewDeliveryService.Patches
 
             int prevCenterX = _prevButton.bounds.X + _prevButton.bounds.Width / 2;
             int nextCenterX = _nextButton.bounds.X + _nextButton.bounds.Width / 2;
+            int cancelCenterX = _cancelButton != null
+                ? _cancelButton.bounds.X + _cancelButton.bounds.Width / 2
+                : int.MaxValue;
 
-            // Wire each top-row slot's upNeighborID to the nearest arrow
+            // Wire each top-row slot's upNeighborID to the nearest button above
             int leftmostID = -1, rightmostID = -1;
             int leftmostX = int.MaxValue, rightmostX = int.MinValue;
             foreach (var slot in slots)
@@ -269,18 +282,35 @@ namespace StardewDeliveryService.Patches
                 if (slot.bounds.Y != minY) continue;
 
                 int slotCenterX = slot.bounds.X + slot.bounds.Width / 2;
-                slot.upNeighborID = System.Math.Abs(slotCenterX - prevCenterX) < System.Math.Abs(slotCenterX - nextCenterX)
-                    ? PrevButtonID : NextButtonID;
+
+                // Find the closest of prev, next, cancel
+                int bestID = PrevButtonID;
+                int bestDist = System.Math.Abs(slotCenterX - prevCenterX);
+
+                int nextDist = System.Math.Abs(slotCenterX - nextCenterX);
+                if (nextDist < bestDist) { bestID = NextButtonID; bestDist = nextDist; }
+
+                if (_cancelButton != null)
+                {
+                    int cancelDist = System.Math.Abs(slotCenterX - cancelCenterX);
+                    if (cancelDist < bestDist) { bestID = CancelButtonID; }
+                }
+
+                slot.upNeighborID = bestID;
 
                 if (slot.bounds.X < leftmostX) { leftmostX = slot.bounds.X; leftmostID = slot.myID; }
                 if (slot.bounds.X > rightmostX) { rightmostX = slot.bounds.X; rightmostID = slot.myID; }
             }
 
-            // Wire arrows down to the corner slots
+            // Wire buttons down to the corner slots
             if (leftmostID >= 0)
                 _prevButton.downNeighborID = leftmostID;
             if (rightmostID >= 0)
+            {
                 _nextButton.downNeighborID = rightmostID;
+                if (_cancelButton != null)
+                    _cancelButton.downNeighborID = rightmostID;
+            }
         }
 
         /// <summary>Wire the bottom chest row's rightmost slot → prev arrow on Android sidebar.</summary>
