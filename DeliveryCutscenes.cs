@@ -1,31 +1,43 @@
+using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
 
 namespace StardewDeliveryService
 {
-    /// <summary>Event scripts for delivery service progression cutscenes.</summary>
+    /// <summary>Event scripts for delivery service progression cutscenes.
+    /// All trigger on the Farm when the player walks outside — Junimo/Shane on the porch.</summary>
     internal static class DeliveryCutscenes
     {
         internal static IMonitor Monitor;
 
-        /// <summary>Junimo appears in FarmHouse to offer free delivery after first bundle completion.</summary>
+        /// <summary>Get the farmhouse porch entry tile. Farmer appears here when exiting.</summary>
+        private static Point GetPorchEntry()
+        {
+            try { return Game1.getFarm().GetMainFarmHouseEntry(); }
+            catch { return new Point(64, 15); } // standard farm fallback
+        }
+
+        /// <summary>Junimo waiting on the porch when player walks outside after completing a bundle.</summary>
         public static void PlayJunimoUnlock()
         {
             if (Game1.eventUp)
                 return;
 
             var location = Game1.currentLocation;
-            if (location == null)
+            if (location is not Farm)
                 return;
 
-            // Event string: no music, camera follows player, farmer and Junimo positioned
-            // Farmer at tile 6,9 facing up (0), Junimo at tile 6,7 facing down (2)
+            var porch = GetPorchEntry();
+            // Farmer at the door, Junimo 2 tiles south on the path facing the farmer
+            int fx = porch.X, fy = porch.Y;
+            int jx = porch.X, jy = porch.Y + 2;
+
             string script =
-                "none/-1000 -1000/farmer 6 9 0 Junimo 6 7 2" +
+                $"none/-1000 -1000/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
                 "/pause 500" +
                 "/emote Junimo 16" +    // ! exclamation
                 "/pause 800" +
-                "/speak Junimo \"We've been watching you help the forest spirits!$h#$b#We can help you carry things between your chests.$h\"" +
+                $"/speak Junimo \"We've been watching you help the forest spirits!$h#$b#We can help you carry things between your chests.$h\"" +
                 "/pause 400" +
                 "/emote Junimo 20" +    // heart
                 "/pause 1000" +
@@ -42,24 +54,28 @@ namespace StardewDeliveryService
             location.startEvent(evt);
         }
 
-        /// <summary>Junimo says farewell after player buys Joja membership.</summary>
+        /// <summary>Junimo on the porch, says farewell after player buys Joja membership.</summary>
         public static void PlayJojaBetrayal()
         {
             if (Game1.eventUp)
                 return;
 
             var location = Game1.currentLocation;
-            if (location == null)
+            if (location is not Farm)
                 return;
 
+            var porch = GetPorchEntry();
+            int fx = porch.X, fy = porch.Y;
+            int jx = porch.X, jy = porch.Y + 2;
+
             string script =
-                "none/-1000 -1000/farmer 6 9 0 Junimo 6 7 2" +
+                $"none/-1000 -1000/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
                 "/pause 500" +
                 "/emote Junimo 28" +    // ... sad/ellipsis
                 "/pause 800" +
                 "/speak Junimo \"...\"" +
                 "/pause 400" +
-                "/speak Junimo \"We understand. Goodbye, friend.$s\"" +
+                $"/speak Junimo \"We understand. Goodbye, friend.$s\"" +
                 "/pause 600" +
                 "/end";
 
@@ -74,23 +90,27 @@ namespace StardewDeliveryService
             location.startEvent(evt);
         }
 
-        /// <summary>Shane offers paid delivery service after Joja route disables Junimos.</summary>
+        /// <summary>Shane on the porch offering paid delivery after Joja route.</summary>
         public static void PlayShaneOffer()
         {
             if (Game1.eventUp)
                 return;
 
             var location = Game1.currentLocation;
-            if (location == null)
+            if (location is not Farm)
                 return;
 
-            // Shane at the door area (tile 3,7), farmer nearby
+            var porch = GetPorchEntry();
+            int fx = porch.X, fy = porch.Y;
+            // Shane standing to the right of the path, facing left toward the farmer
+            int sx = porch.X + 1, sy = porch.Y + 2;
+
             string script =
-                "none/-1000 -1000/farmer 6 9 0 Shane 3 7 1" +
+                $"none/-1000 -1000/farmer {fx} {fy} 2 Shane {sx} {sy} 3" +
                 "/pause 500" +
-                "/speak Shane \"Hey, farmer. Heard the little guys aren't helping you anymore.$s#$b#I could deliver stuff between your chests... for a small fee.$h\"" +
+                $"/speak Shane \"Hey, farmer. Heard the little guys aren't helping you anymore.$s#$b#I could deliver stuff between your chests... for a small fee.$h\"" +
                 "/pause 400" +
-                "/speak Shane \"Just 1%% of the sell value. Not bad, right?$h\"" +
+                $"/speak Shane \"Just 1%% of the sell value. Not bad, right?$h\"" +
                 "/pause 600" +
                 "/end";
 

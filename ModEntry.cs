@@ -40,6 +40,7 @@ namespace StardewDeliveryService
             helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
             helper.Events.GameLoop.Saving += this.OnSaving;
             helper.Events.GameLoop.DayStarted += this.OnDayStarted;
+            helper.Events.Player.Warped += this.OnWarped;
             helper.Events.Display.MenuChanged += this.OnMenuChanged;
         }
 
@@ -65,15 +66,25 @@ namespace StardewDeliveryService
             if (!Config.EnableProgressionGating)
                 return;
 
+            // Check conditions and set flags — cutscene is triggered when player walks outside
             DeliveryState.CheckMorningCutscenes();
+        }
 
-            // Delay cutscene start to avoid conflicting with morning events
-            if (DeliveryState.ShouldPlayJunimoUnlock)
-                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJunimoUnlock(), 1500);
-            else if (DeliveryState.ShouldPlayJojaCutscene)
-                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJojaBetrayal(), 1500);
-            else if (DeliveryState.ShouldPlayShaneCutscene)
-                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayShaneOffer(), 1500);
+        private void OnWarped(object sender, WarpedEventArgs e)
+        {
+            if (!Config.EnableProgressionGating || !e.IsLocalPlayer)
+                return;
+
+            // Trigger cutscene when player walks out to the Farm (porch scene)
+            if (e.NewLocation is Farm)
+            {
+                if (DeliveryState.ShouldPlayJunimoUnlock)
+                    DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJunimoUnlock(), 500);
+                else if (DeliveryState.ShouldPlayJojaCutscene)
+                    DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJojaBetrayal(), 500);
+                else if (DeliveryState.ShouldPlayShaneCutscene)
+                    DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayShaneOffer(), 500);
+            }
         }
 
         private void OnMenuChanged(object sender, MenuChangedEventArgs e)
