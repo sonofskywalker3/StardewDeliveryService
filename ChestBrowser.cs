@@ -47,6 +47,8 @@ namespace StardewDeliveryService
         private static bool GrabFromChest_Prefix(Item item, Farmer who)
         {
             if (!_isActive || !_chargeFees) return true;
+            // Don't charge if the transfer won't actually happen (inventory full)
+            if (!who.couldInventoryAcceptThisItem(item)) return true;
             return TryAccumulateFee(item, who);
         }
 
@@ -190,7 +192,7 @@ namespace StardewDeliveryService
         {
             int sellValue = item.sellToStorePrice();
             if (sellValue <= 0) return 0;
-            return Math.Max(1, (int)(sellValue * 0.01 * item.Stack));
+            return Math.Max(1, (int)(sellValue * 0.03 * item.Stack));
         }
 
         /// <summary>Add delivery fee to running total. Returns true if transfer should proceed, false to block.</summary>

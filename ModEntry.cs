@@ -130,7 +130,7 @@ namespace StardewDeliveryService
             configMenu.AddBoolOption(
                 mod: this.ModManifest,
                 name: () => "Progression Gating",
-                tooltip: () => "Require Community Center progress to unlock deliveries.\nComplete a bundle to earn Junimo delivery (free).\nJoja members get Shane's delivery (1% fee).\nWhen disabled, delivery is always available with no cost.",
+                tooltip: () => "Require Community Center progress to unlock deliveries.\nComplete a bundle to earn Junimo delivery (free).\nJoja members get Shane's delivery (3% fee).\nWhen disabled, delivery is always available with no cost.",
                 getValue: () => Config.EnableProgressionGating,
                 setValue: value => Config.EnableProgressionGating = value
             );
