@@ -503,8 +503,13 @@ namespace StardewDeliveryService.Patches
             // Only draw the label here — it's at the top of the menu, above the tooltip area.
             if (!string.IsNullOrEmpty(_chestLabel))
             {
+                // Append delivery fee to the label when Shane is charging
+                string displayLabel = _chestLabel;
+                if (ChestBrowser.ChargeFees && ChestBrowser.CurrentCost > 0)
+                    displayLabel += $" — Fee: {ChestBrowser.CurrentCost}g";
+
                 var font = Game1.smallFont;
-                var textSize = font.MeasureString(_chestLabel);
+                var textSize = font.MeasureString(displayLabel);
                 var grab = __instance.ItemsToGrabMenu;
                 float centerX = grab.xPositionOnScreen + grab.width / 2f;
                 float textX = centerX - textSize.X / 2f;
@@ -520,11 +525,11 @@ namespace StardewDeliveryService.Patches
                 // Black outline (draw offset in 4 directions)
                 var outlineColor = Color.Black;
                 var pos = new Vector2(textX, textY);
-                b.DrawString(font, _chestLabel, pos + new Vector2(-2, 0), outlineColor);
-                b.DrawString(font, _chestLabel, pos + new Vector2(2, 0), outlineColor);
-                b.DrawString(font, _chestLabel, pos + new Vector2(0, -2), outlineColor);
-                b.DrawString(font, _chestLabel, pos + new Vector2(0, 2), outlineColor);
-                b.DrawString(font, _chestLabel, pos, Color.White);
+                b.DrawString(font, displayLabel, pos + new Vector2(-2, 0), outlineColor);
+                b.DrawString(font, displayLabel, pos + new Vector2(2, 0), outlineColor);
+                b.DrawString(font, displayLabel, pos + new Vector2(0, -2), outlineColor);
+                b.DrawString(font, displayLabel, pos + new Vector2(0, 2), outlineColor);
+                b.DrawString(font, displayLabel, pos, Color.White);
             }
 
             // Redraw cursor on top

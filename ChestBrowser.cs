@@ -42,6 +42,7 @@ namespace StardewDeliveryService
 
         public static bool IsActive => _isActive;
         public static bool ChargeFees => _chargeFees;
+        public static int CurrentCost => _lastDisplayedCost;
 
         /// <summary>Open the chest browser starting at the first chest.</summary>
         public static void Open()
