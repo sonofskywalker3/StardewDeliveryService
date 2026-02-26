@@ -68,6 +68,19 @@ namespace StardewDeliveryService
                 getValue: () => Config.EnableChestBrowser,
                 setValue: value => Config.EnableChestBrowser = value
             );
+
+            configMenu.AddSectionTitle(
+                mod: this.ModManifest,
+                text: () => "Progression"
+            );
+
+            configMenu.AddBoolOption(
+                mod: this.ModManifest,
+                name: () => "Progression Gating",
+                tooltip: () => "Require Community Center progress to unlock deliveries.\nComplete a bundle to earn Junimo delivery (free).\nJoja members get Shane's delivery (1% fee).\nWhen disabled, delivery is always available with no cost.",
+                getValue: () => Config.EnableProgressionGating,
+                setValue: value => Config.EnableProgressionGating = value
+            );
         }
 
         private void ScanChests(string command, string[] args)
@@ -96,6 +109,7 @@ namespace StardewDeliveryService
     public interface IGenericModConfigMenuApi
     {
         void Register(IManifest mod, Action reset, Action save, bool titleScreenOnly = false);
+        void AddSectionTitle(IManifest mod, Func<string> text, Func<string> tooltip = null);
         void AddBoolOption(IManifest mod, Func<bool> getValue, Action<bool> setValue, Func<string> name, Func<string> tooltip = null, string fieldId = null);
     }
 }
