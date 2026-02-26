@@ -29,7 +29,6 @@ namespace StardewDeliveryService
             InventoryPagePatches.Apply(harmony);
             ItemGrabMenuPatches.Apply(harmony);
             DeliveryCutscenes.Apply(harmony);
-            ChestBrowser.Apply(harmony);
 
             this.Monitor.Log("Stardew Delivery Service loaded", LogLevel.Info);
 
@@ -44,6 +43,7 @@ namespace StardewDeliveryService
             helper.Events.GameLoop.DayStarted += this.OnDayStarted;
             helper.Events.Player.Warped += this.OnWarped;
             helper.Events.Display.MenuChanged += this.OnMenuChanged;
+            helper.Events.GameLoop.UpdateTicked += this.OnUpdateTicked;
         }
 
         private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
@@ -87,6 +87,11 @@ namespace StardewDeliveryService
                 else if (DeliveryState.ShouldPlayShaneCutscene)
                     DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayShaneOffer(), 500);
             }
+        }
+
+        private void OnUpdateTicked(object sender, UpdateTickedEventArgs e)
+        {
+            ChestBrowser.OnUpdateTicked();
         }
 
         private void OnMenuChanged(object sender, MenuChangedEventArgs e)
