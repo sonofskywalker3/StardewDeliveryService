@@ -1,3 +1,4 @@
+using System.Linq;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
@@ -10,11 +11,48 @@ namespace StardewDeliveryService
     {
         internal static IMonitor Monitor;
 
+        /// <summary>Unique ID for the Junimo TemporaryAnimatedSprite so we can clean it up.</summary>
+        private const int JunimoSpriteId = 777777;
+
         /// <summary>Get the farmhouse porch entry tile. Farmer appears here when exiting.</summary>
         private static Point GetPorchEntry()
         {
             try { return Game1.getFarm().GetMainFarmHouseEntry(); }
             catch { return new Point(64, 15); } // standard farm fallback
+        }
+
+        /// <summary>Add a visible bouncing Junimo sprite at the given tile position.
+        /// The Event system's built-in "Junimo" actor doesn't render on the Farm,
+        /// so we use a TemporaryAnimatedSprite instead.</summary>
+        private static void SpawnJunimoSprite(GameLocation location, int tileX, int tileY, Color color)
+        {
+            // Junimo idle bounce: frames 8-11 on the sprite sheet (row 1, columns 0-3)
+            // Sheet is 128px wide = 8 columns of 16px sprites
+            location.temporarySprites.Add(new TemporaryAnimatedSprite(
+                "Characters\\Junimo",
+                new Rectangle(0, 16, 16, 16), // idle frames start at row 1
+                100f,   // animation interval (ms per frame)
+                4,      // animation length (4 frames)
+                999,    // loops (enough for any cutscene duration)
+                new Vector2(tileX * 64, tileY * 64 - 32),
+                flicker: false,
+                flipped: false,
+                layerDepth: (tileY * 64f) / 10000f + 0.001f,
+                alphaFade: 0f,
+                color: color,
+                scale: 3f, // Junimo scale: 0.75 * 4 = 3
+                scaleChange: 0f,
+                rotation: 0f,
+                rotationChange: 0f
+            ) { id = JunimoSpriteId });
+        }
+
+        /// <summary>Remove the Junimo sprite from the location.</summary>
+        private static void CleanupJunimoSprite(GameLocation location)
+        {
+            var toRemove = location.temporarySprites.Where(s => s.id == JunimoSpriteId).ToList();
+            foreach (var sprite in toRemove)
+                location.temporarySprites.Remove(sprite);
         }
 
         /// <summary>Junimo waiting on the porch when player walks outside after completing a bundle.</summary>
@@ -31,24 +69,23 @@ namespace StardewDeliveryService
             int fx = porch.X, fy = porch.Y;
             int jx = porch.X, jy = porch.Y + 2;
 
-            // Camera centered on porch area; Junimo 2 tiles south of door
-            // Use 'message' for text since Junimos have no portrait data for 'speak'
+            // Spawn a green Junimo sprite 2 tiles south of the door
+            SpawnJunimoSprite(location, jx, jy, Color.LimeGreen);
+
+            // Event with just the farmer — Junimo visual is handled by the TAS above
             string script =
-                $"none/{fx} {fy}/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
-                "/pause 500" +
-                "/emote Junimo 16" +    // ! exclamation
+                $"none/{fx} {fy}/farmer {fx} {fy} 2" +
                 "/pause 800" +
                 "/message \"A small Junimo bounces excitedly on your porch!\"" +
                 "/pause 400" +
-                "/message \"It seems to be offering to help carry things between your chests.\"" +
-                "/pause 400" +
-                "/emote Junimo 20" +    // heart
+                "/message \"He hands you a small pin. I wonder what it does?\"" +
                 "/pause 800" +
                 "/end";
 
             var evt = new Event(script, null, "SDS_JunimoUnlock");
             evt.onEventFinished = () =>
             {
+                CleanupJunimoSprite(location);
                 DeliveryState.UnlockJunimo();
                 Game1.addHUDMessage(new HUDMessage("Junimo Delivery Service unlocked!") { noIcon = true });
                 Monitor?.Log("Junimo unlock cutscene completed", LogLevel.Info);
@@ -71,10 +108,11 @@ namespace StardewDeliveryService
             int fx = porch.X, fy = porch.Y;
             int jx = porch.X, jy = porch.Y + 2;
 
+            // Spawn a green Junimo sprite (slower animation for sad mood)
+            SpawnJunimoSprite(location, jx, jy, Color.LimeGreen);
+
             string script =
-                $"none/{fx} {fy}/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
-                "/pause 500" +
-                "/emote Junimo 28" +    // ... sad/ellipsis
+                $"none/{fx} {fy}/farmer {fx} {fy} 2" +
                 "/pause 800" +
                 "/message \"The Junimo looks at you sadly...\"" +
                 "/pause 400" +
@@ -85,6 +123,7 @@ namespace StardewDeliveryService
             var evt = new Event(script, null, "SDS_JojaBetrayal");
             evt.onEventFinished = () =>
             {
+                CleanupJunimoSprite(location);
                 DeliveryState.DisableJunimoForJoja();
                 Game1.addHUDMessage(new HUDMessage("The Junimos have stopped helping.") { noIcon = true });
                 Monitor?.Log("Joja betrayal cutscene completed", LogLevel.Info);
