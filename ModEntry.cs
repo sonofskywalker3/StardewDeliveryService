@@ -1,5 +1,4 @@
 using System;
-using Microsoft.Xna.Framework;
 using HarmonyLib;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;

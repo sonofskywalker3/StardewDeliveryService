@@ -23,7 +23,6 @@ namespace StardewDeliveryService.Patches
 
         // Cached reflection for tooltip fields (private on Android, public on PC)
         private static FieldInfo _hoverTextField;
-        private static FieldInfo _hoverTitleField;
         private static FieldInfo _hoveredItemField;
 
         internal static void Init(ModConfig config, IMonitor monitor)
@@ -85,7 +84,6 @@ namespace StardewDeliveryService.Patches
             _junimoTexture = Game1.content.Load<Texture2D>("Characters\\Junimo");
 
             _hoverTextField = AccessTools.Field(typeof(InventoryPage), "hoverText");
-            _hoverTitleField = AccessTools.Field(typeof(InventoryPage), "hoverTitle");
             _hoveredItemField = AccessTools.Field(typeof(InventoryPage), "hoveredItem");
         }
 

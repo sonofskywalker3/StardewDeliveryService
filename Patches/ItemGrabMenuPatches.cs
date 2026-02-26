@@ -66,6 +66,9 @@ namespace StardewDeliveryService.Patches
         /// <summary>Create arrow buttons and label when the chest browser opens an ItemGrabMenu.</summary>
         internal static void SetupArrowButtons(ItemGrabMenu menu, string label)
         {
+            // Clear stale arrows from any prior session before creating new ones
+            _prevButton = null;
+            _nextButton = null;
             _chestLabel = label;
 
             bool isAndroid = Constants.TargetPlatform == GamePlatform.Android;
