@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using HarmonyLib;
 using StardewModdingAPI;
 using StardewValley;
@@ -25,6 +26,12 @@ namespace StardewDeliveryService
         /// <summary>The HUD message showing the running total (kept alive while browsing).</summary>
         private static HUDMessage _costMessage;
 
+        /// <summary>Tracks the delivery cost of items taken from chests but not yet returned.
+        /// Key: QualifiedItemId, Value: total pending cost for that item type.
+        /// When an item is returned to a chest, its cost is consumed from here (free return).
+        /// Remaining value on session close is added to the bill.</summary>
+        private static Dictionary<string, int> _returnCredits = new();
+
         internal static IMonitor Monitor;
 
         public static bool IsActive => _isActive;
@@ -43,20 +50,74 @@ namespace StardewDeliveryService
             );
         }
 
-        /// <summary>Intercept chest→player transfers to accumulate delivery fees.</summary>
+        /// <summary>Intercept chest→player transfers. Don't charge yet — track as returnable.</summary>
         private static bool GrabFromChest_Prefix(Item item, Farmer who)
         {
             if (!_isActive || !_chargeFees) return true;
-            // Don't charge if the transfer won't actually happen (inventory full)
             if (!who.couldInventoryAcceptThisItem(item)) return true;
-            return TryAccumulateFee(item, who);
+
+            int cost = CalculateDeliveryCost(item);
+            if (cost > 0)
+            {
+                string key = item.QualifiedItemId;
+                _returnCredits.TryGetValue(key, out int existing);
+                _returnCredits[key] = existing + cost;
+            }
+            return true;
         }
 
-        /// <summary>Intercept player→chest transfers to accumulate delivery fees.</summary>
-        private static bool GrabFromInventory_Prefix(Item item, Farmer who)
+        /// <summary>Intercept player→chest transfers. Free if returning an item, otherwise charge.</summary>
+        private static bool GrabFromInventory_Prefix(Chest __instance, Item item, Farmer who)
         {
             if (!_isActive || !_chargeFees) return true;
-            return TryAccumulateFee(item, who);
+
+            // Block transfer if chest can't accept the item
+            if (!CanChestAcceptItem(__instance, item))
+            {
+                Game1.playSound("cancel");
+                return false;
+            }
+
+            int cost = CalculateDeliveryCost(item);
+            if (cost <= 0) return true;
+
+            // Check if this is a return (item came from a chest earlier this session)
+            string key = item.QualifiedItemId;
+            if (_returnCredits.TryGetValue(key, out int credit) && credit > 0)
+            {
+                // Consume credit — this is a free return
+                int consumed = Math.Min(cost, credit);
+                _returnCredits[key] = credit - consumed;
+                int remainder = cost - consumed;
+                if (remainder <= 0) return true; // fully covered by return credit
+                cost = remainder;
+            }
+
+            // Charge for the transfer
+            int availableGold = who.Money - _runningTotal;
+            if (availableGold < cost)
+            {
+                Game1.addHUDMessage(new HUDMessage($"Not enough gold! This costs {cost}g.") { noIcon = true });
+                Game1.playSound("cancel");
+                return false;
+            }
+
+            _runningTotal += cost;
+            UpdateCostHUD();
+            return true;
+        }
+
+        /// <summary>Check if a chest has room for an item (stackable slot or empty slot).</summary>
+        private static bool CanChestAcceptItem(Chest chest, Item item)
+        {
+            var items = chest.GetItemsForPlayer();
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i] == null) return true;
+                if (items[i].canStackWith(item) && items[i].Stack < items[i].maximumStackSize())
+                    return true;
+            }
+            return items.Count < chest.GetActualCapacity();
         }
 
         /// <summary>Open the chest browser starting at the first chest.</summary>
@@ -80,6 +141,7 @@ namespace StardewDeliveryService
             _isActive = true;
             _runningTotal = 0;
             _costMessage = null;
+            _returnCredits.Clear();
             _chargeFees = ModEntry.Config.EnableProgressionGating
                 && DeliveryState.Provider == DeliveryProvider.Shane;
             OpenCurrentChest();
@@ -106,6 +168,10 @@ namespace StardewDeliveryService
         /// <summary>Called when the ItemGrabMenu closes to reset state.</summary>
         public static void OnMenuClosed()
         {
+            // Finalize any remaining return credits as charges (items taken but not returned)
+            int unreturned = _returnCredits.Values.Sum();
+            _runningTotal += unreturned;
+
             // Charge accumulated delivery fees
             if (_runningTotal > 0)
             {
@@ -122,6 +188,7 @@ namespace StardewDeliveryService
             }
 
             _runningTotal = 0;
+            _returnCredits.Clear();
             _isActive = false;
             _chests = null;
             ItemGrabMenuPatches.ClearArrowButtons();
@@ -187,31 +254,12 @@ namespace StardewDeliveryService
             }
         }
 
-        /// <summary>Calculate delivery fee: 1% of sell value * stack size. Free for unsellable items.</summary>
+        /// <summary>Calculate delivery fee: 3% of sell value * stack size. Free for unsellable items.</summary>
         private static int CalculateDeliveryCost(Item item)
         {
             int sellValue = item.sellToStorePrice();
             if (sellValue <= 0) return 0;
             return Math.Max(1, (int)(sellValue * 0.03 * item.Stack));
-        }
-
-        /// <summary>Add delivery fee to running total. Returns true if transfer should proceed, false to block.</summary>
-        private static bool TryAccumulateFee(Item item, Farmer who)
-        {
-            int cost = CalculateDeliveryCost(item);
-            if (cost <= 0) return true; // free transfer
-
-            int availableGold = who.Money - _runningTotal;
-            if (availableGold < cost)
-            {
-                Game1.addHUDMessage(new HUDMessage($"Not enough gold! This costs {cost}g.") { noIcon = true });
-                Game1.playSound("cancel");
-                return false;
-            }
-
-            _runningTotal += cost;
-            UpdateCostHUD();
-            return true;
         }
 
         /// <summary>Show or update the persistent HUD message with the running delivery total.</summary>
@@ -221,7 +269,12 @@ namespace StardewDeliveryService
             if (_costMessage != null)
                 Game1.hudMessages.Remove(_costMessage);
 
-            _costMessage = new HUDMessage($"Delivery total: {_runningTotal}g") { noIcon = true, timeLeft = 99999f };
+            // Show pending charges + confirmed charges
+            int pending = _returnCredits.Values.Sum();
+            int display = _runningTotal + pending;
+            if (display <= 0) return;
+
+            _costMessage = new HUDMessage($"Delivery total: {display}g") { noIcon = true, timeLeft = 99999f };
             Game1.addHUDMessage(_costMessage);
         }
     }
