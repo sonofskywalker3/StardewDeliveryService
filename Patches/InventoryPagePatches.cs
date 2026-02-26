@@ -19,6 +19,7 @@ namespace StardewDeliveryService.Patches
 
         private static ClickableTextureComponent _deliveryIcon;
         private static Texture2D _junimoTexture;
+        private static Texture2D _shaneTexture;
         private static bool _positioned;
 
         // Cached reflection for tooltip fields (private on Android, public on PC)
@@ -82,6 +83,7 @@ namespace StardewDeliveryService.Patches
             }
 
             _junimoTexture = Game1.content.Load<Texture2D>("Characters\\Junimo");
+            _shaneTexture = Game1.content.Load<Texture2D>("Characters\\Shane");
 
             _hoverTextField = AccessTools.Field(typeof(InventoryPage), "hoverText");
             _hoveredItemField = AccessTools.Field(typeof(InventoryPage), "hoveredItem");
@@ -223,14 +225,36 @@ namespace StardewDeliveryService.Patches
         private static bool IsIconVisible =>
             !Config.EnableProgressionGating || DeliveryState.IsUnlocked;
 
-        /// <summary>Draw the Junimo icon with a green tint.</summary>
-        private static void DrawJunimoIcon(SpriteBatch b)
+        /// <summary>Draw the provider icon — Junimo (green) or Shane (white) based on active provider.</summary>
+        private static void DrawProviderIcon(SpriteBatch b)
         {
+            Texture2D texture;
+            Rectangle sourceRect;
+            Color tint;
+
+            if (Config.EnableProgressionGating && DeliveryState.Provider == DeliveryProvider.Shane
+                && _shaneTexture != null)
+            {
+                texture = _shaneTexture;
+                sourceRect = new Rectangle(0, 0, 16, 16); // head portion of sprite
+                tint = Color.White;
+                _deliveryIcon.hoverText = "Shane's Delivery";
+            }
+            else
+            {
+                texture = _junimoTexture ?? Game1.mouseCursors;
+                sourceRect = _junimoTexture != null
+                    ? new Rectangle(0, 0, 16, 16)
+                    : new Rectangle(331, 374, 15, 14);
+                tint = new Color(80, 200, 80); // Junimo green
+                _deliveryIcon.hoverText = "Delivery Service";
+            }
+
             b.Draw(
-                _deliveryIcon.texture,
+                texture,
                 new Vector2(_deliveryIcon.bounds.X, _deliveryIcon.bounds.Y),
-                _deliveryIcon.sourceRect,
-                new Color(80, 200, 80),  // Junimo green
+                sourceRect,
+                tint,
                 0f,
                 Vector2.Zero,
                 _deliveryIcon.scale,
@@ -252,7 +276,7 @@ namespace StardewDeliveryService.Patches
             if (!(gm.GetCurrentPage() is InventoryPage invPage) || __instance != invPage.inventory)
                 return;
 
-            DrawJunimoIcon(b);
+            DrawProviderIcon(b);
         }
 
         private static void Draw_Postfix(InventoryPage __instance, SpriteBatch b)
@@ -274,7 +298,7 @@ namespace StardewDeliveryService.Patches
             // Android: icon is drawn in InventoryMenu_Draw_Prefix (before tooltips).
             if (Constants.TargetPlatform != GamePlatform.Android && IsIconVisible)
             {
-                DrawJunimoIcon(b);
+                DrawProviderIcon(b);
 
                 var hoveredItem = _hoveredItemField?.GetValue(__instance) as Item;
                 var hoverText = _hoverTextField?.GetValue(__instance) as string;
