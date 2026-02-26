@@ -26,9 +26,6 @@ namespace StardewDeliveryService.Patches
         private static FieldInfo _hoverTitleField;
         private static FieldInfo _hoveredItemField;
 
-        // Android-only: InventoryMenu.drawInfoPanel(SpriteBatch, bool) for mobile floating tooltips
-        private static MethodInfo _drawInfoPanelMethod;
-
         internal static void Init(ModConfig config, IMonitor monitor)
         {
             Config = config;
@@ -79,9 +76,6 @@ namespace StardewDeliveryService.Patches
             _hoverTextField = AccessTools.Field(typeof(InventoryPage), "hoverText");
             _hoverTitleField = AccessTools.Field(typeof(InventoryPage), "hoverTitle");
             _hoveredItemField = AccessTools.Field(typeof(InventoryPage), "hoveredItem");
-
-            // Android has InventoryMenu.drawInfoPanel(SpriteBatch, bool) — PC doesn't
-            _drawInfoPanelMethod = AccessTools.Method(typeof(InventoryMenu), "drawInfoPanel", new[] { typeof(SpriteBatch), typeof(bool) });
         }
 
         private static void Constructor_Postfix(InventoryPage __instance)
@@ -244,22 +238,21 @@ namespace StardewDeliveryService.Patches
                 0.86f
             );
 
-            // Redraw tooltips on top of our icon so they aren't hidden behind it
-            // Android: redraw mobile floating tooltip via InventoryMenu.drawInfoPanel
-            if (_drawInfoPanelMethod != null && __instance.inventory != null)
-                _drawInfoPanelMethod.Invoke(__instance.inventory, new object[] { b, true });
-
-            // PC: redraw standard tooltips
-            var hoveredItem = _hoveredItemField?.GetValue(__instance) as Item;
-            var hoverText = _hoverTextField?.GetValue(__instance) as string;
-
-            if (hoveredItem != null)
+            // Redraw tooltips on top of our icon so they aren't hidden behind it (PC only —
+            // Android tooltips are drawn inside InventoryMenu.draw and can't be redrawn here)
+            if (Constants.TargetPlatform != GamePlatform.Android)
             {
-                IClickableMenu.drawToolTip(b, hoveredItem.getDescription(), hoveredItem.DisplayName, hoveredItem, Game1.player.CursorSlotItem != null);
-            }
-            else if (!string.IsNullOrEmpty(hoverText))
-            {
-                IClickableMenu.drawHoverText(b, hoverText, Game1.smallFont);
+                var hoveredItem = _hoveredItemField?.GetValue(__instance) as Item;
+                var hoverText = _hoverTextField?.GetValue(__instance) as string;
+
+                if (hoveredItem != null)
+                {
+                    IClickableMenu.drawToolTip(b, hoveredItem.getDescription(), hoveredItem.DisplayName, hoveredItem, Game1.player.CursorSlotItem != null);
+                }
+                else if (!string.IsNullOrEmpty(hoverText))
+                {
+                    IClickableMenu.drawHoverText(b, hoverText, Game1.smallFont);
+                }
             }
 
             __instance.drawMouse(b);

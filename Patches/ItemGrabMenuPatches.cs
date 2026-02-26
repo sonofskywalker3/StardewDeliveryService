@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -21,9 +20,6 @@ namespace StardewDeliveryService.Patches
         private static ClickableTextureComponent _prevButton;
         private static ClickableTextureComponent _nextButton;
         private static string _chestLabel;
-
-        // Android-only: InventoryMenu.drawInfoPanel(SpriteBatch, bool) for mobile floating tooltips
-        private static MethodInfo _drawInfoPanelMethod;
 
         internal static void Init(ModConfig config, IMonitor monitor)
         {
@@ -59,8 +55,12 @@ namespace StardewDeliveryService.Patches
                 postfix: new HarmonyMethod(typeof(ItemGrabMenuPatches), nameof(PerformHoverAction_Postfix))
             );
 
-            // Android has InventoryMenu.drawInfoPanel(SpriteBatch, bool) — PC doesn't
-            _drawInfoPanelMethod = AccessTools.Method(typeof(InventoryMenu), "drawInfoPanel", new[] { typeof(SpriteBatch), typeof(bool) });
+            // Draw arrows during InventoryMenu.draw — this places them in the z-order
+            // BEFORE ItemGrabMenu draws tooltips, so arrows appear behind tooltips naturally.
+            harmony.Patch(
+                original: AccessTools.Method(typeof(InventoryMenu), nameof(InventoryMenu.draw), new[] { typeof(SpriteBatch) }),
+                postfix: new HarmonyMethod(typeof(ItemGrabMenuPatches), nameof(InventoryMenu_Draw_Postfix))
+            );
         }
 
         /// <summary>Create arrow buttons and label when the chest browser opens an ItemGrabMenu.</summary>
@@ -379,6 +379,21 @@ namespace StardewDeliveryService.Patches
             __instance.junimoNoteIcon = null;
         }
 
+        /// <summary>
+        /// Draw arrows during InventoryMenu.draw (the chest grid). This places them in the
+        /// z-order BEFORE ItemGrabMenu's tooltip drawing, so tooltips naturally appear on top.
+        /// </summary>
+        private static void InventoryMenu_Draw_Postfix(InventoryMenu __instance, SpriteBatch b)
+        {
+            if (_prevButton == null || _nextButton == null || !ChestBrowser.IsActive)
+                return;
+            if (!(Game1.activeClickableMenu is ItemGrabMenu igm) || __instance != igm.ItemsToGrabMenu)
+                return;
+
+            _prevButton.draw(b);
+            _nextButton.draw(b);
+        }
+
         private static void Draw_Postfix(ItemGrabMenu __instance, SpriteBatch b)
         {
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
@@ -387,10 +402,8 @@ namespace StardewDeliveryService.Patches
             // Re-inject and re-wire every frame
             InjectArrowButtons(__instance);
 
-            _prevButton?.draw(b);
-            _nextButton?.draw(b);
-
-            // Draw chest label
+            // Arrows are drawn in InventoryMenu_Draw_Postfix (before tooltips in z-order).
+            // Only draw the label here — it's at the top of the menu, above the tooltip area.
             if (!string.IsNullOrEmpty(_chestLabel))
             {
                 var font = Game1.smallFont;
@@ -417,23 +430,7 @@ namespace StardewDeliveryService.Patches
                 b.DrawString(font, _chestLabel, pos, Color.White);
             }
 
-            // Redraw tooltips on top of our arrows/label
-            // Android: redraw mobile floating tooltips via InventoryMenu.drawInfoPanel
-            if (_drawInfoPanelMethod != null)
-            {
-                if (__instance.inventory != null)
-                    _drawInfoPanelMethod.Invoke(__instance.inventory, new object[] { b, true });
-                if (__instance.ItemsToGrabMenu != null)
-                    _drawInfoPanelMethod.Invoke(__instance.ItemsToGrabMenu, new object[] { b, true });
-            }
-
-            // PC: redraw standard tooltips
-            if (__instance.hoveredItem != null)
-                IClickableMenu.drawToolTip(b, __instance.hoveredItem.getDescription(), __instance.hoveredItem.DisplayName, __instance.hoveredItem, Game1.player.CursorSlotItem != null);
-            else if (!string.IsNullOrEmpty(__instance.hoverText))
-                IClickableMenu.drawHoverText(b, __instance.hoverText, Game1.smallFont);
-
-            // Redraw cursor on top so arrows/label don't cover it
+            // Redraw cursor on top
             __instance.drawMouse(b);
         }
 
