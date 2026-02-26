@@ -153,11 +153,15 @@ namespace StardewDeliveryService.Patches
 
         private static void InjectDeliveryIcon(InventoryPage page)
         {
-            if (_deliveryIcon == null)
+            if (_deliveryIcon == null || page.allClickableComponents == null)
                 return;
 
-            if (page.allClickableComponents != null && !page.allClickableComponents.Contains(_deliveryIcon))
+            bool shouldBeWired = IsIconVisible;
+
+            if (shouldBeWired && !page.allClickableComponents.Contains(_deliveryIcon))
                 page.allClickableComponents.Add(_deliveryIcon);
+            else if (!shouldBeWired)
+                page.allClickableComponents.Remove(_deliveryIcon);
         }
 
         /// <summary>
