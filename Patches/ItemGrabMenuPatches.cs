@@ -288,19 +288,21 @@ namespace StardewDeliveryService.Patches
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
                 return true;
 
-            // LT/RT cycle chests
+            // LT/RT cycle chests — preserve current cursor position
             if (__0 == Buttons.LeftTrigger)
             {
-                ChestBrowser.CyclePrev();
+                int snapID = __instance.currentlySnappedComponent?.myID ?? -1;
+                ChestBrowser.CyclePrev(snapID);
                 return false;
             }
             if (__0 == Buttons.RightTrigger)
             {
-                ChestBrowser.CycleNext();
+                int snapID = __instance.currentlySnappedComponent?.myID ?? -1;
+                ChestBrowser.CycleNext(snapID);
                 return false;
             }
 
-            // A button on arrow buttons (controller snap navigation)
+            // A button on arrow buttons — stay on the arrow after cycling
             if (__0 == Buttons.A)
             {
                 var snapped = __instance.currentlySnappedComponent;
@@ -309,13 +311,13 @@ namespace StardewDeliveryService.Patches
                     if (snapped.myID == PrevButtonID)
                     {
                         Game1.playSound("smallSelect");
-                        ChestBrowser.CyclePrev();
+                        ChestBrowser.CyclePrev(PrevButtonID);
                         return false;
                     }
                     if (snapped.myID == NextButtonID)
                     {
                         Game1.playSound("smallSelect");
-                        ChestBrowser.CycleNext();
+                        ChestBrowser.CycleNext(NextButtonID);
                         return false;
                     }
                 }

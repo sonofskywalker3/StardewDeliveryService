@@ -1,7 +1,7 @@
 {
     "Name": "Stardew Delivery Service",
     "Author": "sonofskywalker3",
-    "Version": "0.4.6",
+    "Version": "0.4.7",
     "Description": "Pulls building/trade materials from your chests when you're short, plus a chest browser accessible from your inventory.",
     "UniqueID": "sonofskywalker3.StardewDeliveryService",
     "EntryDll": "StardewDeliveryService.dll",
