@@ -219,6 +219,10 @@ namespace StardewDeliveryService.Patches
                 trash.upNeighborID = DeliveryIconID;
         }
 
+        /// <summary>Whether the icon should be visible (progression gating may hide it).</summary>
+        private static bool IsIconVisible =>
+            !Config.EnableProgressionGating || DeliveryState.IsUnlocked;
+
         /// <summary>Draw the Junimo icon with a green tint.</summary>
         private static void DrawJunimoIcon(SpriteBatch b)
         {
@@ -241,7 +245,7 @@ namespace StardewDeliveryService.Patches
         /// </summary>
         private static void InventoryMenu_Draw_Prefix(InventoryMenu __instance, SpriteBatch b)
         {
-            if (!Config.EnableChestBrowser || _deliveryIcon == null)
+            if (!Config.EnableChestBrowser || _deliveryIcon == null || !IsIconVisible)
                 return;
             if (!(Game1.activeClickableMenu is GameMenu gm))
                 return;
@@ -268,7 +272,7 @@ namespace StardewDeliveryService.Patches
 
             // PC: draw icon here and redraw tooltips on top.
             // Android: icon is drawn in InventoryMenu_Draw_Prefix (before tooltips).
-            if (Constants.TargetPlatform != GamePlatform.Android)
+            if (Constants.TargetPlatform != GamePlatform.Android && IsIconVisible)
             {
                 DrawJunimoIcon(b);
 
@@ -300,7 +304,7 @@ namespace StardewDeliveryService.Patches
 
         private static void ReceiveLeftClick_Postfix(InventoryPage __instance, int x, int y)
         {
-            if (!Config.EnableChestBrowser || _deliveryIcon == null)
+            if (!Config.EnableChestBrowser || _deliveryIcon == null || !IsIconVisible)
                 return;
 
             if (_deliveryIcon.containsPoint(x, y))
@@ -312,7 +316,7 @@ namespace StardewDeliveryService.Patches
 
         private static void PerformHoverAction_Postfix(InventoryPage __instance, int x, int y)
         {
-            if (!Config.EnableChestBrowser || _deliveryIcon == null)
+            if (!Config.EnableChestBrowser || _deliveryIcon == null || !IsIconVisible)
                 return;
 
             _deliveryIcon.tryHover(x, y, 0.2f);
