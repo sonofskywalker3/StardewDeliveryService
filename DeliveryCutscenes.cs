@@ -205,7 +205,7 @@ namespace StardewDeliveryService
             string script =
                 $"none/{fx} {fy}/farmer {fx} {fy} 2 Shane {sx} {sy} 3" +
                 "/pause 500" +
-                $"/speak Shane \"Hey. So... I need some extra cash. Drinking money, you know how it is.$s#$b#Look, if you ever need stuff hauled around your farm or whatever, I could do that. For a cut.$neutral#$b#Just don't make it weird. Call me if you need me.$s\"" +
+                $"/speak Shane \"Hey. So... I need some extra cash. Drinking money, you know how it is.$s#$b#Look, if you ever need stuff hauled around your farm or whatever, I could do that. For a cut.#$b#Just don't make it weird. Call me if you need me.$s\"" +
                 "/pause 600" +
                 "/end";
 
