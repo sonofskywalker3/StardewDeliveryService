@@ -178,7 +178,7 @@ namespace StardewDeliveryService
             evt.onEventFinished = () =>
             {
                 DeliveryState.DisableJunimoForJoja();
-                Game1.addHUDMessage(new HUDMessage("The Junimos have stopped helping.") { noIcon = true });
+                Game1.addHUDMessage(new HUDMessage("The Junimos have left the Valley.") { noIcon = true });
                 Monitor?.Log("Joja betrayal cutscene completed", LogLevel.Info);
             };
 
@@ -205,9 +205,7 @@ namespace StardewDeliveryService
             string script =
                 $"none/{fx} {fy}/farmer {fx} {fy} 2 Shane {sx} {sy} 3" +
                 "/pause 500" +
-                $"/speak Shane \"Hey, farmer. Heard the little guys aren't helping you anymore.$s#$b#I could deliver stuff between your chests... for a small fee.$h\"" +
-                "/pause 400" +
-                $"/speak Shane \"Just 1%% of the sell value. Not bad, right?$h\"" +
+                $"/speak Shane \"I'm starting a new pickup and delivery service.$h#$b#I'd be happy to fetch or move stuff for you, for a price. Just call me if you need me.$h\"" +
                 "/pause 600" +
                 "/end";
 
@@ -215,7 +213,7 @@ namespace StardewDeliveryService
             evt.onEventFinished = () =>
             {
                 DeliveryState.UnlockShane();
-                Game1.addHUDMessage(new HUDMessage("Shane's Delivery Service unlocked! (1% fee per item)") { noIcon = true });
+                Game1.addHUDMessage(new HUDMessage("Shane's Delivery Service unlocked!") { noIcon = true });
                 Monitor?.Log("Shane offer cutscene completed", LogLevel.Info);
             };
 

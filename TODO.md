@@ -127,6 +127,17 @@ Current version: **0.6.10** — Progression gating MVP. Junimo/Shane cutscenes, 
   - 10 hearts: "Ah, forget it. This one's on me." (occasional free delivery)
 - Shane's dialogue pool expands with friendship (warmer phrases at higher hearts).
 
+### 13b. Shane Tip System
+- Let the player tip Shane when closing the chest browser to buy friendship points.
+- Encourages using the delivery service to build the relationship faster.
+- Could be a dialog prompt on close: "Leave a tip?" with amount options.
+- Tips convert to friendship points at some exchange rate.
+
+### 13c. Return-to-Origin Cost Reduction
+- If an item is moved back to the chest it originally came from, reduce or waive the delivery fee.
+- Only applies to the SAME chest — moving to a different chest still costs full price.
+- Needs per-item origin tracking during a chest browser session.
+
 ### 14. Delivery Log / History
 - Optional: track what was delivered, when, cost (for Shane). Viewable somewhere — maybe a second tab in the chest browser, or a journal entry.
 - Low priority, nice-to-have.
