@@ -35,12 +35,43 @@ namespace StardewDeliveryService
 
             // Events
             helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
+            helper.Events.GameLoop.SaveLoaded += this.OnSaveLoaded;
+            helper.Events.GameLoop.Saving += this.OnSaving;
+            helper.Events.GameLoop.DayStarted += this.OnDayStarted;
             helper.Events.Display.MenuChanged += this.OnMenuChanged;
         }
 
         private void OnGameLaunched(object sender, GameLaunchedEventArgs e)
         {
             RegisterConfigMenu();
+        }
+
+        private void OnSaveLoaded(object sender, SaveLoadedEventArgs e)
+        {
+            if (Config.EnableProgressionGating)
+                DeliveryState.OnSaveLoaded(this.Helper, this.Monitor);
+        }
+
+        private void OnSaving(object sender, SavingEventArgs e)
+        {
+            if (Config.EnableProgressionGating)
+                DeliveryState.OnSaving(this.Helper);
+        }
+
+        private void OnDayStarted(object sender, DayStartedEventArgs e)
+        {
+            if (!Config.EnableProgressionGating)
+                return;
+
+            DeliveryState.CheckMorningCutscenes();
+
+            // Delay cutscene start to avoid conflicting with morning events
+            if (DeliveryState.ShouldPlayJunimoUnlock)
+                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJunimoUnlock(), 1500);
+            else if (DeliveryState.ShouldPlayJojaCutscene)
+                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayJojaBetrayal(), 1500);
+            else if (DeliveryState.ShouldPlayShaneCutscene)
+                DelayedAction.functionAfterDelay(() => DeliveryCutscenes.PlayShaneOffer(), 1500);
         }
 
         private void OnMenuChanged(object sender, MenuChangedEventArgs e)
