@@ -74,6 +74,14 @@ namespace StardewDeliveryService
             }
         }
 
+        /// <summary>Clear all cutscene flags so they don't replay on re-entering the Farm.</summary>
+        public static void ClearCutsceneFlag()
+        {
+            ShouldPlayJunimoUnlock = false;
+            ShouldPlayJojaCutscene = false;
+            ShouldPlayShaneCutscene = false;
+        }
+
         /// <summary>Mark the Junimo service as unlocked.</summary>
         public static void UnlockJunimo()
         {

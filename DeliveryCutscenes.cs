@@ -47,12 +47,37 @@ namespace StardewDeliveryService
             ) { id = JunimoSpriteId });
         }
 
-        /// <summary>Remove the Junimo sprite from the location.</summary>
+        /// <summary>Remove the Junimo sprite with a sparkle puff effect and sound.</summary>
         private static void CleanupJunimoSprite(GameLocation location)
         {
-            var toRemove = location.temporarySprites.Where(s => s.id == JunimoSpriteId).ToList();
-            foreach (var sprite in toRemove)
-                location.temporarySprites.Remove(sprite);
+            // Find the sprite to get its position before removing
+            var junimoSprite = location.temporarySprites.FirstOrDefault(s => s.id == JunimoSpriteId);
+            if (junimoSprite != null)
+            {
+                var pos = junimoSprite.Position;
+
+                // Sparkle burst — same sprite indices (5, 46) the game uses for CC Junimo effects
+                for (int i = 0; i < 8; i++)
+                {
+                    location.temporarySprites.Add(new TemporaryAnimatedSprite(
+                        Game1.random.Next(2) == 0 ? 5 : 46,
+                        pos + new Vector2(Game1.random.Next(-8, 24), Game1.random.Next(-8, 24)),
+                        Color.LimeGreen
+                    )
+                    {
+                        motion = new Vector2(
+                            (float)(Game1.random.NextDouble() * 2.0 - 1.0),
+                            (float)(Game1.random.NextDouble() * -2.0)
+                        ),
+                        alphaFade = 0.02f,
+                        layerDepth = 1f,
+                        scale = 1f
+                    });
+                }
+                location.localSound("junimoMeep1");
+
+                location.temporarySprites.Remove(junimoSprite);
+            }
         }
 
         /// <summary>Junimo waiting on the porch when player walks outside after completing a bundle.</summary>
@@ -64,6 +89,9 @@ namespace StardewDeliveryService
             var location = Game1.currentLocation;
             if (location is not Farm)
                 return;
+
+            // Clear flag immediately so re-entering the Farm doesn't replay
+            DeliveryState.ClearCutsceneFlag();
 
             var porch = GetPorchEntry();
             int fx = porch.X, fy = porch.Y;
@@ -104,6 +132,8 @@ namespace StardewDeliveryService
             if (location is not Farm)
                 return;
 
+            DeliveryState.ClearCutsceneFlag();
+
             var porch = GetPorchEntry();
             int fx = porch.X, fy = porch.Y;
             int jx = porch.X, jy = porch.Y + 2;
@@ -141,6 +171,8 @@ namespace StardewDeliveryService
             var location = Game1.currentLocation;
             if (location is not Farm)
                 return;
+
+            DeliveryState.ClearCutsceneFlag();
 
             var porch = GetPorchEntry();
             int fx = porch.X, fy = porch.Y;
