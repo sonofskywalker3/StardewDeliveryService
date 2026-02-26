@@ -33,6 +33,7 @@ namespace StardewDeliveryService
 
             // Console commands
             helper.ConsoleCommands.Add("sds_scan", "List all chests and their contents.", this.ScanChests);
+            helper.ConsoleCommands.Add("sds_status", "Show delivery service progression status.", this.ShowStatus);
 
             // Events
             helper.Events.GameLoop.GameLaunched += this.OnGameLaunched;
@@ -103,7 +104,14 @@ namespace StardewDeliveryService
 
             configMenu.AddSectionTitle(
                 mod: this.ModManifest,
-                text: () => "Progression"
+                text: () => Config.EnableProgressionGating && Context.IsWorldReady
+                    ? DeliveryState.Provider switch
+                    {
+                        DeliveryProvider.Junimo => "Junimo Delivery Service",
+                        DeliveryProvider.Shane => "Shane's Delivery Service",
+                        _ => "Delivery Service (Locked)"
+                    }
+                    : "Progression"
             );
 
             configMenu.AddBoolOption(
@@ -113,6 +121,25 @@ namespace StardewDeliveryService
                 getValue: () => Config.EnableProgressionGating,
                 setValue: value => Config.EnableProgressionGating = value
             );
+        }
+
+        private void ShowStatus(string command, string[] args)
+        {
+            if (!Context.IsWorldReady)
+            {
+                this.Monitor.Log("Load a save first!", LogLevel.Warn);
+                return;
+            }
+
+            if (!Config.EnableProgressionGating)
+            {
+                this.Monitor.Log("Progression gating is disabled — delivery always available, no cost.", LogLevel.Info);
+                return;
+            }
+
+            this.Monitor.Log($"Provider: {DeliveryState.Provider}", LogLevel.Info);
+            this.Monitor.Log($"Unlocked: {DeliveryState.IsUnlocked}", LogLevel.Info);
+            this.Monitor.Log($"Joja member: {Game1.MasterPlayer.mailReceived.Contains("JojaMember")}", LogLevel.Info);
         }
 
         private void ScanChests(string command, string[] args)
