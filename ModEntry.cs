@@ -20,6 +20,7 @@ namespace StardewDeliveryService
             // Init patch classes
             ChestScanner.Monitor = this.Monitor;
             ChestBrowser.Monitor = this.Monitor;
+            DeliveryCutscenes.Monitor = this.Monitor;
             InventoryPagePatches.Init(Config, this.Monitor);
             ItemGrabMenuPatches.Init(Config, this.Monitor);
 
