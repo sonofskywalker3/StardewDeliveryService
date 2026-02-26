@@ -20,6 +20,13 @@ namespace StardewDeliveryService
         /// <summary>Open the chest browser starting at the first chest.</summary>
         public static void Open()
         {
+            // Gate: require progression unlock when gating is enabled
+            if (ModEntry.Config.EnableProgressionGating && !DeliveryState.IsUnlocked)
+            {
+                Game1.addHUDMessage(new HUDMessage("Complete a Community Center bundle to unlock deliveries.") { noIcon = true });
+                return;
+            }
+
             _chests = ChestScanner.GetAllChests();
             if (_chests.Count == 0)
             {
