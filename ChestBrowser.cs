@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using HarmonyLib;
 using StardewModdingAPI;
 using StardewValley;
@@ -32,7 +31,7 @@ namespace StardewDeliveryService
         /// <summary>Deep copy of each chest's contents when first opened (for cancel/restore).</summary>
         private static Dictionary<Chest, List<Item>> _chestItemSnapshots = new();
 
-        /// <summary>Last calculated pending cost (cached to avoid HUD spam).</summary>
+        /// <summary>Last calculated pending cost (cached to avoid redundant updates).</summary>
         private static int _lastDisplayedCost;
 
         internal static IMonitor Monitor;
@@ -90,7 +89,7 @@ namespace StardewDeliveryService
             OpenCurrentChest(snapToComponentID);
         }
 
-        /// <summary>Called every tick while browser is active to update the cost HUD.</summary>
+        /// <summary>Called every tick while browser is active to track delivery cost.</summary>
         public static void OnUpdateTicked()
         {
             if (!_isActive || !_chargeFees) return;
@@ -182,27 +181,16 @@ namespace StardewDeliveryService
                     source: 1,
                     context: chest
                 );
-                Monitor?.Log("ItemGrabMenu created OK", LogLevel.Trace);
             }
             catch (Exception ex)
             {
-                Monitor?.Log($"CRASH in ItemGrabMenu constructor: {ex}", LogLevel.Error);
+                Monitor?.Log($"Failed to create ItemGrabMenu: {ex}", LogLevel.Error);
                 _isActive = false;
                 return;
             }
 
             Game1.activeClickableMenu = menu;
-
-            try
-            {
-                // Set up < > arrow buttons and label for mouse/touch cycling
-                ItemGrabMenuPatches.SetupArrowButtons(menu, label);
-                Monitor?.Log("SetupArrowButtons OK", LogLevel.Trace);
-            }
-            catch (Exception ex)
-            {
-                Monitor?.Log($"CRASH in SetupArrowButtons: {ex}", LogLevel.Error);
-            }
+            ItemGrabMenuPatches.SetupArrowButtons(menu, label);
 
             // Snap cursor to the requested component (e.g. same slot the user was on)
             if (snapToComponentID >= 0)
