@@ -196,8 +196,8 @@ namespace StardewDeliveryService.Patches
             {
                 myID = CancelButtonID,
                 leftNeighborID = -7777, // wired dynamically in WirePCArrowsToChestGrid
-                rightNeighborID = -7777,
-                upNeighborID = -7777,
+                rightNeighborID = NextButtonID,
+                upNeighborID = NextButtonID,
                 downNeighborID = -99998, // wired dynamically
                 hoverText = "Cancel (restore items)"
             };
