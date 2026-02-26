@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using StardewModdingAPI;
 using StardewValley;
@@ -88,6 +89,30 @@ namespace StardewDeliveryService
 
             Monitor?.Log($"Opening chest: {info.Label} ({info.LocationName}) [{_currentIndex + 1}/{_chests.Count}] items={chest.GetItemsForPlayer().Count}", LogLevel.Trace);
 
+            // Wrap chest callbacks with cost logic when Shane is the provider
+            ItemGrabMenu.behaviorOnItemSelect grabFromInventory = chest.grabItemFromInventory;
+            ItemGrabMenu.behaviorOnItemSelect grabFromChest = chest.grabItemFromChest;
+
+            bool chargeDeliveryFee = ModEntry.Config.EnableProgressionGating
+                && DeliveryState.Provider == DeliveryProvider.Shane;
+
+            if (chargeDeliveryFee)
+            {
+                var originalFromInventory = grabFromInventory;
+                grabFromInventory = (item, who) =>
+                {
+                    if (!TryChargeDeliveryFee(item, who)) return;
+                    originalFromInventory(item, who);
+                };
+
+                var originalFromChest = grabFromChest;
+                grabFromChest = (item, who) =>
+                {
+                    if (!TryChargeDeliveryFee(item, who)) return;
+                    originalFromChest(item, who);
+                };
+            }
+
             // Create ItemGrabMenu directly — don't use chest.ShowMenu() which goes through
             // the lid animation system and crashes for remote (non-current-location) chests
             var menu = new ItemGrabMenu(
@@ -95,9 +120,9 @@ namespace StardewDeliveryService
                 reverseGrab: false,
                 showReceivingMenu: true,
                 InventoryMenu.highlightAllItems,
-                chest.grabItemFromInventory,
+                grabFromInventory,
                 null,
-                chest.grabItemFromChest,
+                grabFromChest,
                 snapToBottom: false,
                 canBeExitedWithKey: true,
                 playRightClickSound: true,
@@ -121,6 +146,32 @@ namespace StardewDeliveryService
                     menu.snapCursorToCurrentSnappedComponent();
                 }
             }
+        }
+
+        /// <summary>Calculate delivery fee: 1% of sell value * stack size. Free for unsellable items.</summary>
+        private static int CalculateDeliveryCost(Item item)
+        {
+            int sellValue = item.sellToStorePrice();
+            if (sellValue <= 0) return 0;
+            return Math.Max(1, (int)(sellValue * 0.01 * item.Stack));
+        }
+
+        /// <summary>Charge delivery fee. Returns true if transfer should proceed, false to block.</summary>
+        private static bool TryChargeDeliveryFee(Item item, Farmer who)
+        {
+            int cost = CalculateDeliveryCost(item);
+            if (cost <= 0) return true; // free transfer
+
+            if (who.Money < cost)
+            {
+                Game1.addHUDMessage(new HUDMessage($"Not enough gold! Delivery costs {cost}g.") { noIcon = true });
+                Game1.playSound("cancel");
+                return false;
+            }
+
+            who.Money -= cost;
+            Game1.addHUDMessage(new HUDMessage($"Delivery fee: {cost}g") { noIcon = true });
+            return true;
         }
     }
 }
