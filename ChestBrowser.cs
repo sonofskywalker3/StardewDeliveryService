@@ -14,6 +14,15 @@ namespace StardewDeliveryService
         private static int _currentIndex;
         private static bool _isActive;
 
+        /// <summary>Accumulated delivery fee for the current session (charged on close).</summary>
+        private static int _runningTotal;
+
+        /// <summary>Whether the current session charges delivery fees.</summary>
+        private static bool _chargeFees;
+
+        /// <summary>The HUD message showing the running total (kept alive while browsing).</summary>
+        private static HUDMessage _costMessage;
+
         internal static IMonitor Monitor;
 
         public static bool IsActive => _isActive;
@@ -37,6 +46,10 @@ namespace StardewDeliveryService
 
             _currentIndex = 0;
             _isActive = true;
+            _runningTotal = 0;
+            _costMessage = null;
+            _chargeFees = ModEntry.Config.EnableProgressionGating
+                && DeliveryState.Provider == DeliveryProvider.Shane;
             OpenCurrentChest();
         }
 
@@ -61,6 +74,22 @@ namespace StardewDeliveryService
         /// <summary>Called when the ItemGrabMenu closes to reset state.</summary>
         public static void OnMenuClosed()
         {
+            // Charge accumulated delivery fees
+            if (_runningTotal > 0)
+            {
+                Game1.player.Money -= _runningTotal;
+                Game1.addHUDMessage(new HUDMessage($"Shane's fee: {_runningTotal}g") { noIcon = true });
+                Monitor?.Log($"Charged delivery fee: {_runningTotal}g", LogLevel.Trace);
+            }
+
+            // Remove the running total HUD message
+            if (_costMessage != null)
+            {
+                Game1.hudMessages.Remove(_costMessage);
+                _costMessage = null;
+            }
+
+            _runningTotal = 0;
             _isActive = false;
             _chests = null;
             ItemGrabMenuPatches.ClearArrowButtons();
@@ -93,22 +122,19 @@ namespace StardewDeliveryService
             ItemGrabMenu.behaviorOnItemSelect grabFromInventory = chest.grabItemFromInventory;
             ItemGrabMenu.behaviorOnItemSelect grabFromChest = chest.grabItemFromChest;
 
-            bool chargeDeliveryFee = ModEntry.Config.EnableProgressionGating
-                && DeliveryState.Provider == DeliveryProvider.Shane;
-
-            if (chargeDeliveryFee)
+            if (_chargeFees)
             {
                 var originalFromInventory = grabFromInventory;
                 grabFromInventory = (item, who) =>
                 {
-                    if (!TryChargeDeliveryFee(item, who)) return;
+                    if (!TryAccumulateFee(item, who)) return;
                     originalFromInventory(item, who);
                 };
 
                 var originalFromChest = grabFromChest;
                 grabFromChest = (item, who) =>
                 {
-                    if (!TryChargeDeliveryFee(item, who)) return;
+                    if (!TryAccumulateFee(item, who)) return;
                     originalFromChest(item, who);
                 };
             }
@@ -156,22 +182,34 @@ namespace StardewDeliveryService
             return Math.Max(1, (int)(sellValue * 0.01 * item.Stack));
         }
 
-        /// <summary>Charge delivery fee. Returns true if transfer should proceed, false to block.</summary>
-        private static bool TryChargeDeliveryFee(Item item, Farmer who)
+        /// <summary>Add delivery fee to running total. Returns true if transfer should proceed, false to block.</summary>
+        private static bool TryAccumulateFee(Item item, Farmer who)
         {
             int cost = CalculateDeliveryCost(item);
             if (cost <= 0) return true; // free transfer
 
-            if (who.Money < cost)
+            int availableGold = who.Money - _runningTotal;
+            if (availableGold < cost)
             {
-                Game1.addHUDMessage(new HUDMessage($"Not enough gold! Delivery costs {cost}g.") { noIcon = true });
+                Game1.addHUDMessage(new HUDMessage($"Not enough gold! This costs {cost}g.") { noIcon = true });
                 Game1.playSound("cancel");
                 return false;
             }
 
-            who.Money -= cost;
-            Game1.addHUDMessage(new HUDMessage($"Delivery fee: {cost}g") { noIcon = true });
+            _runningTotal += cost;
+            UpdateCostHUD();
             return true;
+        }
+
+        /// <summary>Show or update the persistent HUD message with the running delivery total.</summary>
+        private static void UpdateCostHUD()
+        {
+            // Remove old message
+            if (_costMessage != null)
+                Game1.hudMessages.Remove(_costMessage);
+
+            _costMessage = new HUDMessage($"Delivery total: {_runningTotal}g") { noIcon = true, timeLeft = 99999f };
+            Game1.addHUDMessage(_costMessage);
         }
     }
 }
