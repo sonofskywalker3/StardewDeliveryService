@@ -69,10 +69,30 @@ namespace StardewDeliveryService
                 && DeliveryState.Provider == DeliveryProvider.Shane;
 
             // Snapshot inventory before any transfers
-            _inventorySnapshot = SnapshotInventory();
-            _playerItemSnapshot = DeepCopyItems(Game1.player.Items);
+            try
+            {
+                _inventorySnapshot = SnapshotInventory();
+                Monitor?.Log("[DIAG] SnapshotInventory OK in Open()", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in Open/SnapshotInventory: {ex}", LogLevel.Error);
+                _inventorySnapshot = new();
+            }
+
+            try
+            {
+                _playerItemSnapshot = DeepCopyItems(Game1.player.Items);
+                Monitor?.Log("[DIAG] DeepCopyItems OK in Open()", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in Open/DeepCopyItems: {ex}", LogLevel.Error);
+                _playerItemSnapshot = null;
+            }
             _chestItemSnapshots.Clear();
 
+            Monitor?.Log($"[DIAG] Open(): chargeFees={_chargeFees}, provider={DeliveryState.Provider}, chests={_chests.Count}", LogLevel.Trace);
             OpenCurrentChest();
         }
 
@@ -99,38 +119,17 @@ namespace StardewDeliveryService
         {
             if (!_isActive || !_chargeFees) return;
 
-            try
-            {
-                int cost = CalculateDiffCost();
-                if (cost != _lastDisplayedCost)
-                {
-                    _lastDisplayedCost = cost;
-                    // DIAGNOSTIC: skip HUD updates to test if hudMessages modification causes Android crash
-                    // UpdateCostHUD(cost);
-                    Monitor?.Log($"[DIAG] Cost changed to {cost}g (HUD disabled for crash test)", LogLevel.Trace);
-                }
-            }
-            catch (Exception ex)
-            {
-                Monitor?.Log($"CRASH in OnUpdateTicked/CalculateDiffCost: {ex}", LogLevel.Error);
-                _chargeFees = false; // disable to prevent spam
-            }
+            // DIAGNOSTIC v0.6.33: COMPLETELY BYPASS all cost calculation.
+            // If it still crashes, the problem is in draw/setup, not cost tracking.
+            // If it stops crashing, the problem is in CalculateDiffCost/SnapshotInventory.
         }
 
         /// <summary>Called when the ItemGrabMenu closes to reset state.</summary>
         public static void OnMenuClosed()
         {
-            if (_chargeFees && !_cancelled)
-            {
-                int totalCost = CalculateDiffCost();
-                if (totalCost > 0)
-                {
-                    int charge = Math.Min(totalCost, Game1.player.Money);
-                    Game1.player.Money -= charge;
-                    Game1.addHUDMessage(new HUDMessage($"Shane's fee: {charge}g") { noIcon = true });
-                    Monitor?.Log($"Charged delivery fee: {charge}g (calculated: {totalCost}g)", LogLevel.Trace);
-                }
-            }
+            // DIAGNOSTIC v0.6.33: BYPASS cost charging entirely
+            if (_chargeFees)
+                Monitor?.Log("[DIAG] OnMenuClosed: would charge fees (bypassed for crash test)", LogLevel.Trace);
 
             // Remove the running total HUD message
             if (_costMessage != null)

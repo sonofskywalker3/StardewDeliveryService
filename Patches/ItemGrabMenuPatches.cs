@@ -73,6 +73,7 @@ namespace StardewDeliveryService.Patches
             _nextButton = null;
             _cancelButton = null;
             _chestLabel = label;
+            _firstDrawLogged = false;
 
             bool isAndroid = Constants.TargetPlatform == GamePlatform.Android;
 
@@ -356,6 +357,7 @@ namespace StardewDeliveryService.Patches
             _nextButton = null;
             _cancelButton = null;
             _chestLabel = null;
+            _firstDrawLogged = false;
         }
 
         // Use __0 instead of named param — Android names it "b", PC names it "button"
@@ -463,11 +465,17 @@ namespace StardewDeliveryService.Patches
             return true;
         }
 
+        /// <summary>Tracks whether we've logged the first draw frame (avoid log spam).</summary>
+        private static bool _firstDrawLogged;
+
         /// <summary>Suppress junimoNoteIcon BEFORE the game draws it — nulling in postfix is too late.</summary>
         private static void Draw_Prefix(ItemGrabMenu __instance)
         {
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
                 return;
+
+            if (!_firstDrawLogged)
+                Monitor?.Log("[DIAG] Draw_Prefix entered", LogLevel.Trace);
 
             // junimoNoteIcon appears/disappears dynamically when hovering bundle items,
             // which triggers populateClickableComponentList and disrupts our arrow wiring.
@@ -486,9 +494,24 @@ namespace StardewDeliveryService.Patches
             if (!(Game1.activeClickableMenu is ItemGrabMenu igm) || __instance != igm.ItemsToGrabMenu)
                 return;
 
-            _prevButton.draw(b);
-            _nextButton.draw(b);
-            _cancelButton?.draw(b);
+            try
+            {
+                if (!_firstDrawLogged)
+                    Monitor?.Log($"[DIAG] InventoryMenu_Draw_Postfix: prev=({_prevButton.bounds}), next=({_nextButton.bounds}), cancel={(_cancelButton != null ? _cancelButton.bounds.ToString() : "null")}", LogLevel.Trace);
+
+                _prevButton.draw(b);
+                if (!_firstDrawLogged) Monitor?.Log("[DIAG] prevButton drawn OK", LogLevel.Trace);
+
+                _nextButton.draw(b);
+                if (!_firstDrawLogged) Monitor?.Log("[DIAG] nextButton drawn OK", LogLevel.Trace);
+
+                _cancelButton?.draw(b);
+                if (!_firstDrawLogged) Monitor?.Log("[DIAG] cancelButton drawn OK", LogLevel.Trace);
+            }
+            catch (System.Exception ex)
+            {
+                Monitor?.Log($"CRASH in InventoryMenu_Draw_Postfix: {ex}", LogLevel.Error);
+            }
         }
 
         private static void Draw_Postfix(ItemGrabMenu __instance, SpriteBatch b)
@@ -496,8 +519,21 @@ namespace StardewDeliveryService.Patches
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
                 return;
 
-            // Re-inject and re-wire every frame
-            InjectArrowButtons(__instance);
+            try
+            {
+                if (!_firstDrawLogged)
+                    Monitor?.Log("[DIAG] Draw_Postfix entered", LogLevel.Trace);
+
+                // Re-inject and re-wire every frame
+                InjectArrowButtons(__instance);
+
+                if (!_firstDrawLogged)
+                    Monitor?.Log("[DIAG] InjectArrowButtons OK", LogLevel.Trace);
+            }
+            catch (System.Exception ex)
+            {
+                Monitor?.Log($"CRASH in Draw_Postfix InjectArrowButtons: {ex}", LogLevel.Error);
+            }
 
             // Arrows are drawn in InventoryMenu_Draw_Postfix (before tooltips in z-order).
             // Only draw the label here — it's at the top of the menu, above the tooltip area.
@@ -528,7 +564,17 @@ namespace StardewDeliveryService.Patches
             }
 
             // Redraw cursor on top
-            __instance.drawMouse(b);
+            try
+            {
+                __instance.drawMouse(b);
+                if (!_firstDrawLogged) Monitor?.Log("[DIAG] drawMouse OK", LogLevel.Trace);
+            }
+            catch (System.Exception ex)
+            {
+                Monitor?.Log($"CRASH in Draw_Postfix drawMouse: {ex}", LogLevel.Error);
+            }
+
+            _firstDrawLogged = true;
         }
 
         private static void PerformHoverAction_Postfix(ItemGrabMenu __instance, int x, int y)
