@@ -92,6 +92,7 @@ namespace StardewDeliveryService
             }
             _chestItemSnapshots.Clear();
 
+            _diagRanOnce = false;
             Monitor?.Log($"[DIAG] Open(): chargeFees={_chargeFees}, provider={DeliveryState.Provider}, chests={_chests.Count}", LogLevel.Trace);
             OpenCurrentChest();
         }
@@ -114,14 +115,29 @@ namespace StardewDeliveryService
             OpenCurrentChest(snapToComponentID);
         }
 
+        /// <summary>Whether the first-tick diagnostic has fired.</summary>
+        private static bool _diagRanOnce;
+
         /// <summary>Called every tick while browser is active to update the cost HUD.</summary>
         public static void OnUpdateTicked()
         {
             if (!_isActive || !_chargeFees) return;
 
-            // DIAGNOSTIC v0.6.33: COMPLETELY BYPASS all cost calculation.
-            // If it still crashes, the problem is in draw/setup, not cost tracking.
-            // If it stops crashing, the problem is in CalculateDiffCost/SnapshotInventory.
+            // DIAGNOSTIC v0.6.34: Run CalculateDiffCost ONCE to see if a single call crashes.
+            if (_diagRanOnce) return;
+            _diagRanOnce = true;
+
+            try
+            {
+                Monitor?.Log("[DIAG] About to call CalculateDiffCost (one-shot)...", LogLevel.Trace);
+                int cost = CalculateDiffCost();
+                Monitor?.Log($"[DIAG] CalculateDiffCost returned {cost} (one-shot OK)", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in one-shot CalculateDiffCost: {ex}", LogLevel.Error);
+                _chargeFees = false;
+            }
         }
 
         /// <summary>Called when the ItemGrabMenu closes to reset state.</summary>
