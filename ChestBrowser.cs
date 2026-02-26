@@ -300,7 +300,7 @@ namespace StardewDeliveryService
                 int unitPrice = now.unitPrice > 0 ? now.unitPrice : was.unitPrice;
                 if (unitPrice <= 0) continue; // unsellable items are free
 
-                totalCost += Math.Max(1, (int)(unitPrice * 0.03)) * diff;
+                totalCost += Math.Max(1, (int)(unitPrice * diff * 0.03));
             }
             return totalCost;
         }

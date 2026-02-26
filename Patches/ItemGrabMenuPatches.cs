@@ -16,9 +16,11 @@ namespace StardewDeliveryService.Patches
 
         private const int PrevButtonID = 899;
         private const int NextButtonID = 900;
+        private const int CancelButtonID = 901;
 
         private static ClickableTextureComponent _prevButton;
         private static ClickableTextureComponent _nextButton;
+        private static ClickableTextureComponent _cancelButton;
         private static string _chestLabel;
 
         internal static void Init(ModConfig config, IMonitor monitor)
@@ -63,12 +65,13 @@ namespace StardewDeliveryService.Patches
             );
         }
 
-        /// <summary>Create arrow buttons and label when the chest browser opens an ItemGrabMenu.</summary>
+        /// <summary>Create arrow buttons, cancel button, and label when the chest browser opens an ItemGrabMenu.</summary>
         internal static void SetupArrowButtons(ItemGrabMenu menu, string label)
         {
-            // Clear stale arrows from any prior session before creating new ones
+            // Clear stale buttons from any prior session before creating new ones
             _prevButton = null;
             _nextButton = null;
+            _cancelButton = null;
             _chestLabel = label;
 
             bool isAndroid = Constants.TargetPlatform == GamePlatform.Android;
@@ -78,6 +81,7 @@ namespace StardewDeliveryService.Patches
             else
                 SetupPCArrows(menu);
 
+            SetupCancelButton(menu);
             InjectArrowButtons(menu);
         }
 
@@ -168,6 +172,37 @@ namespace StardewDeliveryService.Patches
             };
         }
 
+        /// <summary>Create the cancel (red X) button near the top-right of the chest grid.</summary>
+        private static void SetupCancelButton(ItemGrabMenu menu)
+        {
+            var grab = menu.ItemsToGrabMenu;
+            if (grab == null) return;
+
+            // Position: top-right of the chest grid area
+            int btnX = grab.xPositionOnScreen + grab.width + 8;
+            int btnY;
+            if (Constants.TargetPlatform == GamePlatform.Android)
+                btnY = menu.yPositionOnScreen + 4;
+            else
+                btnY = menu.yPositionOnScreen - 52;
+
+            // Standard PC close button sprite: Game1.mouseCursors at (337, 494, 12, 12)
+            _cancelButton = new ClickableTextureComponent(
+                new Rectangle(btnX, btnY, 48, 48),
+                Game1.mouseCursors,
+                new Rectangle(337, 494, 12, 12),
+                4f
+            )
+            {
+                myID = CancelButtonID,
+                leftNeighborID = NextButtonID,
+                rightNeighborID = -7777,
+                upNeighborID = -7777,
+                downNeighborID = -99998,
+                hoverText = "Cancel (restore items)"
+            };
+        }
+
         /// <summary>Re-inject arrow buttons and wire neighbors after populateClickableComponentList rebuilds the list.</summary>
         internal static void InjectArrowButtons(ItemGrabMenu menu)
         {
@@ -180,6 +215,8 @@ namespace StardewDeliveryService.Patches
                     menu.allClickableComponents.Add(_prevButton);
                 if (!menu.allClickableComponents.Contains(_nextButton))
                     menu.allClickableComponents.Add(_nextButton);
+                if (_cancelButton != null && !menu.allClickableComponents.Contains(_cancelButton))
+                    menu.allClickableComponents.Add(_cancelButton);
             }
 
             if (Constants.TargetPlatform == GamePlatform.Android)
@@ -282,6 +319,7 @@ namespace StardewDeliveryService.Patches
         {
             _prevButton = null;
             _nextButton = null;
+            _cancelButton = null;
             _chestLabel = null;
         }
 
@@ -305,18 +343,19 @@ namespace StardewDeliveryService.Patches
                 return false;
             }
 
-            // A button on arrow buttons — stay on the arrow after cycling
-            // A button on close button — cancel and restore
+            // A button on arrow/cancel buttons
             if (__0 == Buttons.A)
             {
                 var snapped = __instance.currentlySnappedComponent;
                 if (snapped != null)
                 {
-                    // Close button (X) = cancel all transfers
-                    if (__instance.upperRightCloseButton != null && snapped == __instance.upperRightCloseButton)
+                    // Cancel button (red X) = restore all items and close
+                    if (snapped.myID == CancelButtonID)
                     {
                         ChestBrowser.CancelAndRestore();
-                        return true; // let the menu close normally
+                        Game1.playSound("bigDeSelect");
+                        __instance.exitThisMenu();
+                        return false;
                     }
 
                     if (snapped.myID == PrevButtonID)
@@ -363,11 +402,13 @@ namespace StardewDeliveryService.Patches
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
                 return true;
 
-            // Red X button = cancel all transfers and restore items
-            if (__instance.upperRightCloseButton != null && __instance.upperRightCloseButton.containsPoint(x, y))
+            // Cancel button (red X) = restore all items and close
+            if (_cancelButton != null && _cancelButton.containsPoint(x, y))
             {
                 ChestBrowser.CancelAndRestore();
-                return true; // let the menu close normally
+                Game1.playSound("bigDeSelect");
+                __instance.exitThisMenu();
+                return false;
             }
 
             if (_prevButton != null && _prevButton.containsPoint(x, y))
@@ -412,6 +453,7 @@ namespace StardewDeliveryService.Patches
 
             _prevButton.draw(b);
             _nextButton.draw(b);
+            _cancelButton?.draw(b);
         }
 
         private static void Draw_Postfix(ItemGrabMenu __instance, SpriteBatch b)
@@ -461,6 +503,7 @@ namespace StardewDeliveryService.Patches
 
             _prevButton?.tryHover(x, y, 0.2f);
             _nextButton?.tryHover(x, y, 0.2f);
+            _cancelButton?.tryHover(x, y, 0.2f);
         }
     }
 }
