@@ -20,11 +20,20 @@ namespace StardewDeliveryService
         /// <summary>Whether the current session charges delivery fees.</summary>
         private static bool _chargeFees;
 
+        /// <summary>Whether the user cancelled via the X button (skip charging, restore items).</summary>
+        private static bool _cancelled;
+
         /// <summary>The HUD message showing the running total (kept alive while browsing).</summary>
         private static HUDMessage _costMessage;
 
         /// <summary>Snapshot of player inventory at session open. Key: "QualifiedItemId:Quality", Value: (count, unitSellPrice).</summary>
         private static Dictionary<string, (int count, int unitPrice)> _inventorySnapshot = new();
+
+        /// <summary>Deep copy of player inventory at session open (for cancel/restore).</summary>
+        private static List<Item> _playerItemSnapshot;
+
+        /// <summary>Deep copy of each chest's contents when first opened (for cancel/restore).</summary>
+        private static Dictionary<Chest, List<Item>> _chestItemSnapshots = new();
 
         /// <summary>Last calculated pending cost (cached to avoid HUD spam).</summary>
         private static int _lastDisplayedCost;
@@ -53,6 +62,7 @@ namespace StardewDeliveryService
 
             _currentIndex = 0;
             _isActive = true;
+            _cancelled = false;
             _costMessage = null;
             _lastDisplayedCost = 0;
             _chargeFees = ModEntry.Config.EnableProgressionGating
@@ -60,6 +70,8 @@ namespace StardewDeliveryService
 
             // Snapshot inventory before any transfers
             _inventorySnapshot = SnapshotInventory();
+            _playerItemSnapshot = DeepCopyItems(Game1.player.Items);
+            _chestItemSnapshots.Clear();
 
             OpenCurrentChest();
         }
@@ -98,7 +110,7 @@ namespace StardewDeliveryService
         /// <summary>Called when the ItemGrabMenu closes to reset state.</summary>
         public static void OnMenuClosed()
         {
-            if (_chargeFees)
+            if (_chargeFees && !_cancelled)
             {
                 int totalCost = CalculateDiffCost();
                 if (totalCost > 0)
@@ -118,7 +130,10 @@ namespace StardewDeliveryService
             }
 
             _lastDisplayedCost = 0;
+            _cancelled = false;
             _inventorySnapshot.Clear();
+            _playerItemSnapshot = null;
+            _chestItemSnapshots.Clear();
             _isActive = false;
             _chests = null;
             ItemGrabMenuPatches.ClearArrowButtons();
@@ -144,6 +159,10 @@ namespace StardewDeliveryService
                 while (items.Count < capacity)
                     items.Add(null);
             }
+
+            // Snapshot chest contents on first open (for cancel/restore)
+            if (!_chestItemSnapshots.ContainsKey(chest))
+                _chestItemSnapshots[chest] = DeepCopyItems(chest.GetItemsForPlayer());
 
             Monitor?.Log($"Opening chest: {info.Label} ({info.LocationName}) [{_currentIndex + 1}/{_chests.Count}] items={chest.GetItemsForPlayer().Count}", LogLevel.Trace);
 
@@ -180,7 +199,58 @@ namespace StardewDeliveryService
             }
         }
 
-        /// <summary>Build a map of the player's current inventory: key → (totalCount, unitSellPrice).</summary>
+        /// <summary>Cancel all item movement and restore everything to pre-session state.</summary>
+        public static void CancelAndRestore()
+        {
+            _cancelled = true;
+
+            // Restore player inventory
+            if (_playerItemSnapshot != null)
+            {
+                var inv = Game1.player.Items;
+                for (int i = 0; i < inv.Count && i < _playerItemSnapshot.Count; i++)
+                    inv[i] = _playerItemSnapshot[i];
+            }
+
+            // Clear held/cursor item (it came from somewhere we're restoring)
+            Game1.player.CursorSlotItem = null;
+            if (Game1.activeClickableMenu is ItemGrabMenu menu)
+                menu.heldItem = null;
+
+            // Restore all touched chests
+            foreach (var kvp in _chestItemSnapshots)
+            {
+                var items = kvp.Key.GetItemsForPlayer();
+                var snapshot = kvp.Value;
+                for (int i = 0; i < items.Count && i < snapshot.Count; i++)
+                    items[i] = snapshot[i];
+            }
+
+            Game1.addHUDMessage(new HUDMessage("Delivery cancelled — items restored.") { noIcon = true });
+            Monitor?.Log("Cancel: restored all items to pre-session state", LogLevel.Trace);
+        }
+
+        /// <summary>Deep copy a list of items (for cancel/restore snapshots).</summary>
+        private static List<Item> DeepCopyItems(IList<Item> items)
+        {
+            var copy = new List<Item>(items.Count);
+            foreach (var item in items)
+            {
+                if (item == null)
+                {
+                    copy.Add(null);
+                }
+                else
+                {
+                    var clone = item.getOne();
+                    clone.Stack = item.Stack;
+                    copy.Add(clone);
+                }
+            }
+            return copy;
+        }
+
+        /// <summary>Build a map of the player's current inventory (including cursor/held item): key → (totalCount, unitSellPrice).</summary>
         private static Dictionary<string, (int count, int unitPrice)> SnapshotInventory()
         {
             var map = new Dictionary<string, (int count, int unitPrice)>();
@@ -192,6 +262,21 @@ namespace StardewDeliveryService
                 map.TryGetValue(key, out var existing);
                 map[key] = (existing.count + item.Stack, price > 0 ? price : existing.unitPrice);
             }
+
+            // Include held/cursor item — items picked up from inventory or chest
+            // live here temporarily during transfers. Check both CursorSlotItem
+            // and the menu's heldItem (different SDV versions use different fields).
+            Item heldItem = Game1.player.CursorSlotItem;
+            if (heldItem == null && Game1.activeClickableMenu is ItemGrabMenu igm)
+                heldItem = igm.heldItem;
+            if (heldItem != null)
+            {
+                string key = $"{heldItem.QualifiedItemId}:{heldItem.Quality}";
+                int price = heldItem.sellToStorePrice();
+                map.TryGetValue(key, out var existing);
+                map[key] = (existing.count + heldItem.Stack, price > 0 ? price : existing.unitPrice);
+            }
+
             return map;
         }
 

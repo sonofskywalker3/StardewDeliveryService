@@ -306,11 +306,19 @@ namespace StardewDeliveryService.Patches
             }
 
             // A button on arrow buttons — stay on the arrow after cycling
+            // A button on close button — cancel and restore
             if (__0 == Buttons.A)
             {
                 var snapped = __instance.currentlySnappedComponent;
                 if (snapped != null)
                 {
+                    // Close button (X) = cancel all transfers
+                    if (__instance.upperRightCloseButton != null && snapped == __instance.upperRightCloseButton)
+                    {
+                        ChestBrowser.CancelAndRestore();
+                        return true; // let the menu close normally
+                    }
+
                     if (snapped.myID == PrevButtonID)
                     {
                         Game1.playSound("smallSelect");
@@ -350,10 +358,17 @@ namespace StardewDeliveryService.Patches
             return true;
         }
 
-        private static bool ReceiveLeftClick_Prefix(int x, int y)
+        private static bool ReceiveLeftClick_Prefix(ItemGrabMenu __instance, int x, int y)
         {
             if (!Config.EnableChestBrowser || !ChestBrowser.IsActive)
                 return true;
+
+            // Red X button = cancel all transfers and restore items
+            if (__instance.upperRightCloseButton != null && __instance.upperRightCloseButton.containsPoint(x, y))
+            {
+                ChestBrowser.CancelAndRestore();
+                return true; // let the menu close normally
+            }
 
             if (_prevButton != null && _prevButton.containsPoint(x, y))
             {
