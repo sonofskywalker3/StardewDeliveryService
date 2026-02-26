@@ -29,6 +29,7 @@ namespace StardewDeliveryService
             InventoryPagePatches.Apply(harmony);
             ItemGrabMenuPatches.Apply(harmony);
             DeliveryCutscenes.Apply(harmony);
+            ChestBrowser.Apply(harmony);
 
             this.Monitor.Log("Stardew Delivery Service loaded", LogLevel.Info);
 

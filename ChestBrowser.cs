@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using HarmonyLib;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Menus;
+using StardewValley.Objects;
 using StardewDeliveryService.Patches;
 
 namespace StardewDeliveryService
@@ -26,6 +28,34 @@ namespace StardewDeliveryService
         internal static IMonitor Monitor;
 
         public static bool IsActive => _isActive;
+        public static bool ChargeFees => _chargeFees;
+
+        /// <summary>Apply Harmony patches for delivery fee interception.</summary>
+        public static void Apply(Harmony harmony)
+        {
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Chest), nameof(Chest.grabItemFromChest)),
+                prefix: new HarmonyMethod(typeof(ChestBrowser), nameof(GrabFromChest_Prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Chest), nameof(Chest.grabItemFromInventory)),
+                prefix: new HarmonyMethod(typeof(ChestBrowser), nameof(GrabFromInventory_Prefix))
+            );
+        }
+
+        /// <summary>Intercept chest→player transfers to accumulate delivery fees.</summary>
+        private static bool GrabFromChest_Prefix(Item item, Farmer who)
+        {
+            if (!_isActive || !_chargeFees) return true;
+            return TryAccumulateFee(item, who);
+        }
+
+        /// <summary>Intercept player→chest transfers to accumulate delivery fees.</summary>
+        private static bool GrabFromInventory_Prefix(Item item, Farmer who)
+        {
+            if (!_isActive || !_chargeFees) return true;
+            return TryAccumulateFee(item, who);
+        }
 
         /// <summary>Open the chest browser starting at the first chest.</summary>
         public static void Open()
@@ -118,37 +148,18 @@ namespace StardewDeliveryService
 
             Monitor?.Log($"Opening chest: {info.Label} ({info.LocationName}) [{_currentIndex + 1}/{_chests.Count}] items={chest.GetItemsForPlayer().Count}", LogLevel.Trace);
 
-            // Wrap chest callbacks with cost logic when Shane is the provider
-            ItemGrabMenu.behaviorOnItemSelect grabFromInventory = chest.grabItemFromInventory;
-            ItemGrabMenu.behaviorOnItemSelect grabFromChest = chest.grabItemFromChest;
-
-            if (_chargeFees)
-            {
-                var originalFromInventory = grabFromInventory;
-                grabFromInventory = (item, who) =>
-                {
-                    if (!TryAccumulateFee(item, who)) return;
-                    originalFromInventory(item, who);
-                };
-
-                var originalFromChest = grabFromChest;
-                grabFromChest = (item, who) =>
-                {
-                    if (!TryAccumulateFee(item, who)) return;
-                    originalFromChest(item, who);
-                };
-            }
-
             // Create ItemGrabMenu directly — don't use chest.ShowMenu() which goes through
-            // the lid animation system and crashes for remote (non-current-location) chests
+            // the lid animation system and crashes for remote (non-current-location) chests.
+            // Delivery fees are handled by Harmony prefixes on Chest.grabItemFromChest/grabItemFromInventory
+            // so they persist even when the menu is recreated after each transfer.
             var menu = new ItemGrabMenu(
                 chest.GetItemsForPlayer(),
                 reverseGrab: false,
                 showReceivingMenu: true,
                 InventoryMenu.highlightAllItems,
-                grabFromInventory,
+                chest.grabItemFromInventory,
                 null,
-                grabFromChest,
+                chest.grabItemFromChest,
                 snapToBottom: false,
                 canBeExitedWithKey: true,
                 playRightClickSound: true,
