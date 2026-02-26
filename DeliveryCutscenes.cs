@@ -28,19 +28,22 @@ namespace StardewDeliveryService
                 return;
 
             var porch = GetPorchEntry();
-            // Farmer at the door, Junimo 2 tiles south on the path facing the farmer
             int fx = porch.X, fy = porch.Y;
             int jx = porch.X, jy = porch.Y + 2;
 
+            // Camera centered on porch area; Junimo 2 tiles south of door
+            // Use 'message' for text since Junimos have no portrait data for 'speak'
             string script =
-                $"none/-1000 -1000/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
+                $"none/{fx} {fy}/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
                 "/pause 500" +
                 "/emote Junimo 16" +    // ! exclamation
                 "/pause 800" +
-                $"/speak Junimo \"We've been watching you help the forest spirits!$h#$b#We can help you carry things between your chests.$h\"" +
+                "/message \"A small Junimo bounces excitedly on your porch!\"" +
+                "/pause 400" +
+                "/message \"It seems to be offering to help carry things between your chests.\"" +
                 "/pause 400" +
                 "/emote Junimo 20" +    // heart
-                "/pause 1000" +
+                "/pause 800" +
                 "/end";
 
             var evt = new Event(script, null, "SDS_JunimoUnlock");
@@ -69,13 +72,13 @@ namespace StardewDeliveryService
             int jx = porch.X, jy = porch.Y + 2;
 
             string script =
-                $"none/-1000 -1000/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
+                $"none/{fx} {fy}/farmer {fx} {fy} 2 Junimo {jx} {jy} 0" +
                 "/pause 500" +
                 "/emote Junimo 28" +    // ... sad/ellipsis
                 "/pause 800" +
-                "/speak Junimo \"...\"" +
+                "/message \"The Junimo looks at you sadly...\"" +
                 "/pause 400" +
-                $"/speak Junimo \"We understand. Goodbye, friend.$s\"" +
+                "/message \"It seems to understand. With a quiet wave, it vanishes.\"" +
                 "/pause 600" +
                 "/end";
 
@@ -102,11 +105,11 @@ namespace StardewDeliveryService
 
             var porch = GetPorchEntry();
             int fx = porch.X, fy = porch.Y;
-            // Shane standing to the right of the path, facing left toward the farmer
             int sx = porch.X + 1, sy = porch.Y + 2;
 
+            // Shane has portrait data so 'speak' works here
             string script =
-                $"none/-1000 -1000/farmer {fx} {fy} 2 Shane {sx} {sy} 3" +
+                $"none/{fx} {fy}/farmer {fx} {fy} 2 Shane {sx} {sy} 3" +
                 "/pause 500" +
                 $"/speak Shane \"Hey, farmer. Heard the little guys aren't helping you anymore.$s#$b#I could deliver stuff between your chests... for a small fee.$h\"" +
                 "/pause 400" +
