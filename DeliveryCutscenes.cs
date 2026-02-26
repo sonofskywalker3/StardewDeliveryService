@@ -167,9 +167,9 @@ namespace StardewDeliveryService
             string script =
                 $"none/{fx} {fy}/farmer {fx} {fy} 2" +
                 "/pause 800" +
-                "/message \"The Junimo looks at you sadly...\"" +
+                "/message \"The Junimo stares up at you... then slowly looks away.\"" +
                 "/pause 400" +
-                "/message \"It seems to understand. With a quiet wave, it vanishes.\"" +
+                "/message \"It sets down its little pin and turns to leave. It doesn't wave.\"" +
                 $"/specificTemporarySprite removeSprite {JunimoSpriteId}" +
                 "/pause 2000" +
                 "/end";

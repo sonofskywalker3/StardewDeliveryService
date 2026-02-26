@@ -99,11 +99,19 @@ namespace StardewDeliveryService
         {
             if (!_isActive || !_chargeFees) return;
 
-            int cost = CalculateDiffCost();
-            if (cost != _lastDisplayedCost)
+            try
             {
-                _lastDisplayedCost = cost;
-                UpdateCostHUD(cost);
+                int cost = CalculateDiffCost();
+                if (cost != _lastDisplayedCost)
+                {
+                    _lastDisplayedCost = cost;
+                    UpdateCostHUD(cost);
+                }
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in OnUpdateTicked/CalculateDiffCost: {ex}", LogLevel.Error);
+                _chargeFees = false; // disable to prevent spam
             }
         }
 
@@ -166,26 +174,46 @@ namespace StardewDeliveryService
 
             Monitor?.Log($"Opening chest: {info.Label} ({info.LocationName}) [{_currentIndex + 1}/{_chests.Count}] items={chest.GetItemsForPlayer().Count}", LogLevel.Trace);
 
-            var menu = new ItemGrabMenu(
-                chest.GetItemsForPlayer(),
-                reverseGrab: false,
-                showReceivingMenu: true,
-                InventoryMenu.highlightAllItems,
-                chest.grabItemFromInventory,
-                null,
-                chest.grabItemFromChest,
-                snapToBottom: false,
-                canBeExitedWithKey: true,
-                playRightClickSound: true,
-                allowRightClick: true,
-                showOrganizeButton: true,
-                source: 1,
-                context: chest
-            );
+            ItemGrabMenu menu;
+            try
+            {
+                menu = new ItemGrabMenu(
+                    chest.GetItemsForPlayer(),
+                    reverseGrab: false,
+                    showReceivingMenu: true,
+                    InventoryMenu.highlightAllItems,
+                    chest.grabItemFromInventory,
+                    null,
+                    chest.grabItemFromChest,
+                    snapToBottom: false,
+                    canBeExitedWithKey: true,
+                    playRightClickSound: true,
+                    allowRightClick: true,
+                    showOrganizeButton: true,
+                    source: 1,
+                    context: chest
+                );
+                Monitor?.Log("ItemGrabMenu created OK", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in ItemGrabMenu constructor: {ex}", LogLevel.Error);
+                _isActive = false;
+                return;
+            }
+
             Game1.activeClickableMenu = menu;
 
-            // Set up < > arrow buttons and label for mouse/touch cycling
-            ItemGrabMenuPatches.SetupArrowButtons(menu, label);
+            try
+            {
+                // Set up < > arrow buttons and label for mouse/touch cycling
+                ItemGrabMenuPatches.SetupArrowButtons(menu, label);
+                Monitor?.Log("SetupArrowButtons OK", LogLevel.Trace);
+            }
+            catch (Exception ex)
+            {
+                Monitor?.Log($"CRASH in SetupArrowButtons: {ex}", LogLevel.Error);
+            }
 
             // Snap cursor to the requested component (e.g. same slot the user was on)
             if (snapToComponentID >= 0)
