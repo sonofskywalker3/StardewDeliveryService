@@ -129,7 +129,7 @@ namespace StardewDeliveryService
                 "/pause 800" +
                 "/message \"A Junimo bounces excitedly on your porch!\"" +
                 "/pause 400" +
-                "/message \"He hands you a small pin. I wonder what it does?\"" +
+                "/message \"It hands you a small pin. I wonder what it does?\"" +
                 $"/specificTemporarySprite removeSprite {JunimoSpriteId}" +
                 "/pause 2000" +
                 "/end";
@@ -169,7 +169,7 @@ namespace StardewDeliveryService
                 "/pause 800" +
                 "/message \"The Junimo stares up at you... then slowly looks away.\"" +
                 "/pause 400" +
-                "/message \"It sets down its little pin and turns to leave. It doesn't wave.\"" +
+                "/message \"It turns from you and disappears, and so does the pin it gave you.\"" +
                 $"/specificTemporarySprite removeSprite {JunimoSpriteId}" +
                 "/pause 2000" +
                 "/end";
